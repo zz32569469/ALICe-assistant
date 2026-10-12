@@ -1,6 +1,6 @@
 // WebSocket 連線：自動重連（Core 重啟後不用重新整理，完成標準 7），收到 ping 回 pong。
 
-import { getToken } from "./api";
+import { coreBase, coreReady, getToken } from "./api";
 import type { EventEnvelope } from "./types";
 
 export type ConnectionStatus = "connecting" | "open" | "closed" | "unauthorized";
@@ -31,13 +31,14 @@ export class CoreSocket {
 
   #connect(): void {
     const token = getToken();
-    if (token === undefined) {
+    if (token === undefined || !coreReady()) {
       this.#onStatus("unauthorized");
       return;
     }
     this.#onStatus("connecting");
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`);
+    const base = coreBase();
+    const socketBase = base === "" ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}` : base.replace(/^http/u, "ws");
+    const socket = new WebSocket(`${socketBase}/ws?token=${encodeURIComponent(token)}`);
     this.#socket = socket;
     let opened = false;
     socket.addEventListener("open", () => {
@@ -72,7 +73,7 @@ export class CoreSocket {
 
   async #checkUnauthorized(): Promise<void> {
     try {
-      const response = await fetch("/api/state", { headers: { authorization: `Bearer ${getToken() ?? ""}` } });
+      const response = await fetch(`${coreBase()}/api/state`, { headers: { authorization: `Bearer ${getToken() ?? ""}` } });
       if (response.status === 401) {
         this.stop();
         this.#onStatus("unauthorized");

@@ -173,6 +173,24 @@ test("HTTP authentication and Origin checks protect API routes", async () => {
       headers: { authorization: `Bearer ${core.token}`, origin: "http://evil.example" },
     });
     assert.equal(forbidden.status, 403);
+    assert.equal(forbidden.headers.get("access-control-allow-origin"), null);
+
+    // §91：設定裡允許的來源（放在 GitHub Pages 的 Studio）可以跨來源呼叫，預檢不用 token。
+    const preflight = await fetch(`${core.baseUrl}/api/state`, {
+      method: "OPTIONS",
+      headers: { origin: "https://pc.tail1.ts.net", "access-control-request-method": "GET", "access-control-request-headers": "authorization" },
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "https://pc.tail1.ts.net");
+    assert.match(preflight.headers.get("access-control-allow-headers") ?? "", /authorization/u);
+    assert.equal(preflight.headers.get("access-control-allow-private-network"), "true");
+    const cross = await fetch(`${core.baseUrl}/api/state`, { headers: { authorization: `Bearer ${core.token}`, origin: "https://pc.tail1.ts.net" } });
+    assert.equal(cross.status, 200);
+    assert.equal(cross.headers.get("access-control-allow-origin"), "https://pc.tail1.ts.net");
+    const crossNoToken = await fetch(`${core.baseUrl}/api/state`, { headers: { origin: "https://pc.tail1.ts.net" } });
+    assert.equal(crossNoToken.status, 401);
+    const evilPreflight = await fetch(`${core.baseUrl}/api/state`, { method: "OPTIONS", headers: { origin: "http://evil.example" } });
+    assert.equal(evilPreflight.status, 403);
   } finally {
     await core.close();
     rmSync(directory, { recursive: true, force: true });

@@ -3,6 +3,7 @@ node_modules/
 *.db-journal
 .env
 dist/
+dist-hosted/
 data/
 memory/facts.md
 kb-template-staging/

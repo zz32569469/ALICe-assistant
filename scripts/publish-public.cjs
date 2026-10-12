@@ -3,7 +3,8 @@
 
 // 把目前的程式同步到公開 repo：公開 repo 有自己的歷史（從第一次發布開始），不帶私人 repo 的舊提交。
 // 做法：用 HEAD 的檔案內容在本機分支 `public` 上做一筆提交（上一筆是 public 分支的前一次發布），推到遠端 `public` 的 main。
-// 介紹網頁：HEAD 的 site/ 資料夾另外提交到本機分支 `public-pages`，推到遠端的 gh-pages（GitHub Pages 從這個分支提供網頁）。
+// 網頁：HEAD 的 site/（介紹頁）加上建置好的網頁版 Studio（放在 studio/，§91）另外提交到本機分支 `public-pages`，
+// 推到遠端的 gh-pages（GitHub Pages 從這個分支提供網頁）。
 // 推送前一定先跑字眼檢查：本機清單（local/company-terms.json）必須存在、而且 0 筆才會繼續。
 //
 // 用法：
@@ -11,6 +12,8 @@
 //   node scripts/publish-public.cjs [--message "說明"] [--dry-run]
 
 const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const { loadTerms, scanCompanyTerms } = require('./check-company-terms.cjs');
@@ -50,6 +53,36 @@ function publishTree({ tree, localBranch, remoteBranch, subject, firstSubject, d
   console.log(`${remoteBranch}：已發布 ${commit.slice(0, 7)} ${title}`);
 }
 
+function listFiles(root, relative = '') {
+  const files = [];
+  for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
+    const child = relative === '' ? entry.name : `${relative}/${entry.name}`;
+    if (entry.isDirectory()) files.push(...listFiles(root, child));
+    else if (entry.isFile()) files.push(child);
+  }
+  return files;
+}
+
+/** 建置網頁版 Studio（VITE_HOSTED），和 site/ 合成一個 tree：site/ 在根目錄，Studio 在 studio/。 */
+function pagesTree(siteTree, dryRun) {
+  const studioDir = path.join(repoRoot, 'studio');
+  if (!dryRun) execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build:hosted'], { cwd: studioDir, stdio: 'inherit', shell: process.platform === 'win32' });
+  const dist = path.join(studioDir, 'dist-hosted');
+  if (!fs.existsSync(path.join(dist, 'index.html'))) throw new Error('網頁版 Studio 沒有建置成功（studio/dist-hosted）');
+  const indexFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'alice-pages-')), 'index');
+  const env = { ...process.env, GIT_INDEX_FILE: indexFile };
+  try {
+    git(['read-tree', siteTree], { env });
+    for (const relative of listFiles(dist)) {
+      const blob = git(['hash-object', '-w', path.join(dist, relative)]);
+      git(['update-index', '--add', '--cacheinfo', `100644,${blob},studio/${relative}`], { env });
+    }
+    return git(['write-tree'], { env });
+  } finally {
+    fs.rmSync(path.dirname(indexFile), { recursive: true, force: true });
+  }
+}
+
 function main() {
   const dryRun = process.argv.includes('--dry-run');
   if (git(['status', '--porcelain']) !== '') throw new Error('還有沒提交的修改，請先提交（發布的是最新的提交）');
@@ -73,7 +106,7 @@ function main() {
   });
   const siteTree = tryGit(['rev-parse', 'HEAD:site']);
   if (siteTree !== undefined) {
-    publishTree({ tree: siteTree, localBranch: 'public-pages', remoteBranch: 'gh-pages', subject, firstSubject: '介紹網頁第一次發布', dryRun });
+    publishTree({ tree: pagesTree(siteTree, dryRun), localBranch: 'public-pages', remoteBranch: 'gh-pages', subject, firstSubject: '介紹網頁第一次發布', dryRun });
   }
 }
 

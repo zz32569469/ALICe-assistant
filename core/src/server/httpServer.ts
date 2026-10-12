@@ -240,6 +240,22 @@ export class AliceHttpServer {
 
   async #handleHttp(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url ?? "/", `http://${this.#config.host}`);
+    // §91：放在其他網址的 Studio（例如 GitHub Pages）跨來源呼叫 API；只回應設定裡允許的來源。
+    const crossOrigin = request.headers.origin !== undefined && this.#config.allowedOrigins.includes(request.headers.origin);
+    if (crossOrigin && url.pathname.startsWith("/api/")) {
+      response.setHeader("access-control-allow-origin", request.headers.origin!);
+      response.setHeader("vary", "Origin");
+      if (request.method === "OPTIONS") {
+        response.writeHead(204, {
+          "access-control-allow-methods": "GET, POST, DELETE",
+          "access-control-allow-headers": "authorization, content-type, x-alice-client",
+          "access-control-allow-private-network": "true",
+          "access-control-max-age": "600",
+        });
+        response.end();
+        return;
+      }
+    }
     if (request.method === "GET" && url.pathname === "/api/health") {
       sendJson(response, 200, { ok: true, version: CORE_VERSION });
       return;

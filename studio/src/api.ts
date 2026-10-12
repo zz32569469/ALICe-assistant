@@ -6,21 +6,59 @@ export type Thread = "work" | "chat";
 import type { Channel, ChannelMessage, CodexJobDetail, CodexJobSummary, CodexQuota, Fortune, FortuneKind, FortuneSlot, GameCard, GameConfirmation, Message, PlanView, Plan, QuotaResult, ReportEntry, Task, Meeting, TrackView, UsageSummary } from "./types";
 
 const TOKEN_KEY = "alice.studio.token";
+const CORE_KEY = "alice.studio.core";
 export const CLIENT_ID = "studio";
+
+/** §91：放在 GitHub Pages 等其他網址的 Studio（建置時 VITE_HOSTED=1），要自己設定 Core 的網址；由 Core 提供的 Studio 用同一個網址。 */
+export const HOSTED = import.meta.env.VITE_HOSTED === "1";
 
 export function takeTokenFromUrl(): void {
   const match = /(?:^#|&)token=([0-9a-fA-F]+)/u.exec(window.location.hash);
-  if (match === null) return;
-  try {
-    window.localStorage.setItem(TOKEN_KEY, match[1]!);
-  } catch {
-    // 瀏覽器不允許儲存時，這次連線仍可用記憶體中的 token。
-    memoryToken = match[1]!;
-  }
+  const core = /(?:^#|&)core=([^&]+)/u.exec(window.location.hash);
+  if (match === null && core === null) return;
+  if (core !== null) setCore(decodeURIComponent(core[1]!));
+  if (match !== null) setToken(match[1]!);
   history.replaceState(null, "", window.location.pathname + window.location.search);
 }
 
 let memoryToken: string | undefined;
+let memoryCore: string | undefined;
+
+/** Core 網址只收 http(s)://主機[:埠]，去掉結尾斜線；格式不對回 undefined。 */
+export function normalizeCore(value: string): string | undefined {
+  const trimmed = value.trim().replace(/\/+$/u, "");
+  return /^https?:\/\/[a-z0-9.\-[\]:]+$/iu.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
+
+export function getCore(): string | undefined {
+  try {
+    return window.localStorage.getItem(CORE_KEY) ?? memoryCore;
+  } catch {
+    return memoryCore;
+  }
+}
+
+export function setCore(value: string): boolean {
+  const core = normalizeCore(value);
+  if (core === undefined) return false;
+  memoryCore = core;
+  try {
+    window.localStorage.setItem(CORE_KEY, core);
+  } catch {
+    // 只存在記憶體。
+  }
+  return true;
+}
+
+/** API 與 WebSocket 的前綴：hosted 用設定的 Core 網址，否則用同一個網址（空字串）。 */
+export function coreBase(): string {
+  return HOSTED ? getCore() ?? "" : "";
+}
+
+/** hosted 而且還沒設定 Core 網址時，不能連線。 */
+export function coreReady(): boolean {
+  return !HOSTED || getCore() !== undefined;
+}
 
 export function getToken(): string | undefined {
   try {
@@ -41,8 +79,10 @@ export function setToken(token: string): void {
 
 export function clearToken(): void {
   memoryToken = undefined;
+  memoryCore = undefined;
   try {
     window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(CORE_KEY);
   } catch {
     // 忽略。
   }
@@ -58,7 +98,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(`${coreBase()}${path}`, {
     ...init,
     headers: {
       authorization: `Bearer ${getToken() ?? ""}`,
@@ -93,7 +133,7 @@ export const api = {
   uploadUrl: (name: string): Promise<string> => {
     const cached = uploadUrls.get(name);
     if (cached !== undefined) return cached;
-    const loading = fetch(`/api/uploads/${encodeURIComponent(name)}`, { headers: { authorization: `Bearer ${getToken() ?? ""}` } })
+    const loading = fetch(`${coreBase()}/api/uploads/${encodeURIComponent(name)}`, { headers: { authorization: `Bearer ${getToken() ?? ""}` } })
       .then(async (response) => {
         if (!response.ok) throw new ApiError(response.status, `HTTP ${response.status}`);
         return URL.createObjectURL(await response.blob());

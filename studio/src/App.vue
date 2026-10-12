@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 
-import { api, clearToken, setToken } from "./api";
+import { api, clearToken, getCore, getToken, HOSTED, setCore, setToken } from "./api";
 import { connect, store, meetingEnd } from "./store";
 import avatarImage from "./assets/alice-pixel/avatar_24.png";
 import ChatPanel from "./components/ChatPanel.vue";
@@ -99,9 +99,26 @@ function showConfirmations(): void {
   requestAnimationFrame(() => document.querySelector(".confirm")?.scrollIntoView({ behavior: "smooth", block: "center" }));
 }
 
+/** §91：放在其他網址的 Studio 要填 Core 網址。 */
+const coreUrl = ref(getCore() ?? "");
+const pageOrigin = window.location.origin;
+const loginError = ref("");
+
 function usePastedToken(): void {
   const token = pastedToken.value.trim();
-  if (!/^[0-9a-fA-F]{16,}$/u.test(token)) return;
+  loginError.value = "";
+  if (HOSTED && !setCore(coreUrl.value)) {
+    loginError.value = "Core 網址要像 https://電腦名.xxx.ts.net 或 http://127.0.0.1:7788";
+    return;
+  }
+  if (!/^[0-9a-fA-F]{16,}$/u.test(token)) {
+    if (HOSTED && getToken() !== undefined && token === "") {
+      connect();
+      return;
+    }
+    loginError.value = "token 格式不對";
+    return;
+  }
   setToken(token);
   pastedToken.value = "";
   connect();
@@ -208,17 +225,26 @@ onMounted(() => connect());
         <button v-if="store.connection === 'open' && !store.proxy" class="link small" title="開啟後，ALICe 可以把你交代的指示直接傳給同事 session" @click="toggleProxy">代理人模式</button>
         <span v-if="proxyError" class="error small" :title="proxyError">代理人模式切換失敗</span>
         <button v-if="store.connection === 'open'" class="link small" title="清除這個瀏覽器存的 token" @click="logout">登出</button>
+        <button v-else-if="HOSTED && store.connection === 'closed'" class="link small" title="清除這個瀏覽器存的 Core 網址與 token，重新填" @click="logout">連線設定</button>
       </div>
     </header>
 
     <main v-if="store.connection === 'unauthorized'" class="login">
       <h2>需要登入</h2>
-      <p>請在 Alice Core 的 <code>core</code> 資料夾執行 <code>npm run studio</code>，會自動用正確的網址開啟 Web Studio。</p>
-      <p class="muted small">或貼上 token（在 <code>%APPDATA%\alice\token</code>）：</p>
-      <form class="token-form" @submit.prevent="usePastedToken">
-        <input v-model="pastedToken" type="password" autocomplete="off" placeholder="token" />
-        <button class="primary" type="submit">使用</button>
+      <template v-if="HOSTED">
+        <p>這個網頁只是介面，ALICe 本身在你的電腦上（Core）。填入 Core 的網址和 token 連過去；Core 的 <code>alice.local.json</code> 要把這個網頁的網址（<code>{{ pageOrigin }}</code>）加進 <code>remoteOrigins</code>。</p>
+        <p class="muted small">在 Core 那台電腦上用：<code>http://127.0.0.1:7788</code>；手機或其他電腦：Tailscale 的 <code>https://電腦名.xxx.ts.net</code>。</p>
+      </template>
+      <template v-else>
+        <p>請在 Alice Core 的 <code>core</code> 資料夾執行 <code>npm run studio</code>，會自動用正確的網址開啟 Web Studio。</p>
+        <p class="muted small">或貼上 token（在 <code>%APPDATA%\alice\token</code>）：</p>
+      </template>
+      <form class="token-form" :class="{ hosted: HOSTED }" @submit.prevent="usePastedToken">
+        <input v-if="HOSTED" v-model="coreUrl" type="url" autocomplete="url" placeholder="Core 網址" />
+        <input v-model="pastedToken" type="password" autocomplete="off" placeholder="token（在 %APPDATA%\alice\token）" />
+        <button class="primary" type="submit">連線</button>
       </form>
+      <p v-if="loginError" class="error small">{{ loginError }}</p>
     </main>
 
     <main v-else class="layout" :style="layoutStyle">
@@ -343,7 +369,9 @@ onMounted(() => connect());
 .login { max-width: 520px; margin: 12vh auto 0; padding: 28px; background: var(--panel); border: var(--bw) solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
 .login h2 { margin-top: 0; }
 .token-form { display: flex; gap: 8px; }
-.token-form input { flex: 1; }
+.token-form input { flex: 1; min-width: 0; }
+.token-form.hosted { flex-wrap: wrap; }
+.token-form.hosted input { flex-basis: 100%; }
 
 @media (max-width: 820px) {
   .topbar { padding: 8px 12px; gap: 10px; }
