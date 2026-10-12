@@ -18,6 +18,9 @@ const EMPTY_VAULT_DIRS = [
   '_meta/archive',
 ];
 
+/** §91：網頁版 Studio 的網址來源（公開 repo 的 GitHub Pages）。 */
+const HOSTED_STUDIO_ORIGIN = 'https://zz32569469.github.io';
+
 function parseArgs(argv) {
   const options = {
     workspace: path.dirname(REPO_ROOT),
@@ -266,6 +269,8 @@ async function main(argv = process.argv.slice(2), runtime = {}) {
       codex: {
         available: codexAvailable,
       },
+      // §91：允許 GitHub Pages 上的網頁版 Studio 連到這台的 Core（還是要 token 才能用）；不想用就刪掉。
+      remoteOrigins: [HOSTED_STUDIO_ORIGIN],
       // 先放知識庫管理員一個角色，Core 才會啟用知識庫摘要與部下；其他專案照 alice.local.example.json 補上。
       projects: [
         { name: '知識庫', path: slash(kb), role: '知識庫管理員', readDirs: [], session: 'Library' },
