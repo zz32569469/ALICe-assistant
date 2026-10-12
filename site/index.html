@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="ALICe：在自己電腦上執行、用 Claude Code 訂閱思考的個人助理。">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>ALICe — at your service</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 版面：單欄閱讀寬度，像素頭像開場；色票取自艾莉絲像素圖（夜藍、髮色藍灰、腮紅玫瑰）。 */
+:root {
+  --bg: #f8f5ee;
+  --surface: #ffffff;
+  --sunken: #eef0f6;
+  --fg: #1c1e3a;
+  --muted: #5c5e8a;
+  --line: #d8dce6;
+  --accent: #b84a58;
+  --accent-soft: #f6dcd9;
+  --cool: #2b5bc8;
+  --ok: #1f705a;
+  --font-pixel: "DotGothic16", "Noto Sans TC", ui-monospace, monospace;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --measure: 46rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12131f; --surface: #1c1e3a; --sunken: #171932; --fg: #e6e8ef; --muted: #9ea4c8;
+    --line: #2b2f55; --accent: #e2a4a0; --accent-soft: #3a2433; --cool: #9ea8d4; --ok: #6cc4a4;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12131f; --surface: #1c1e3a; --sunken: #171932; --fg: #e6e8ef; --muted: #9ea4c8;
+  --line: #2b2f55; --accent: #e2a4a0; --accent-soft: #3a2433; --cool: #9ea8d4; --ok: #6cc4a4;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.75; }
+.page { max-width: var(--measure); margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.3; margin: 0; }
+h2 { font-size: 1.35rem; display: flex; align-items: baseline; gap: 10px; }
+h2 .tag { font-family: var(--font-pixel); font-size: 0.8rem; color: var(--accent); letter-spacing: 0.08em; font-weight: 400; }
+h3 { font-size: 1rem; }
+p { margin: 0; }
+a { color: var(--cool); }
+section { display: flex; flex-direction: column; gap: 16px; }
+.muted { color: var(--muted); }
+
+/* 開場 */
+.hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: center; }
+.avatar { width: 120px; height: 120px; image-rendering: pixelated; border-radius: 14px; background: var(--sunken); border: 2px solid var(--line); }
+.wordmark { font-family: var(--font-pixel); font-size: clamp(2.4rem, 7vw, 3.4rem); line-height: 1; letter-spacing: 0.02em; }
+.wordmark .e { color: var(--accent); }
+.tagline { font-family: var(--font-pixel); color: var(--muted); letter-spacing: 0.12em; margin-top: 6px; }
+.lede { font-size: 1.05rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.chips li { font-size: 0.82rem; padding: 2px 10px; border-radius: 999px; background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
+@media (max-width: 520px) { .hero { grid-template-columns: 1fr; } .avatar { width: 96px; height: 96px; } }
+
+/* 功能 */
+.features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 32px; }
+.feature { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.feature h3 { font-family: var(--font-pixel); font-weight: 400; font-size: 1.05rem; color: var(--accent); letter-spacing: 0.04em; }
+.feature ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }
+.feature li::marker { color: var(--muted); }
+@media (max-width: 640px) { .features { grid-template-columns: 1fr; } }
+
+/* 安裝步驟 */
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; counter-reset: step; }
+.steps > li { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 12px; counter-increment: step; }
+.steps > li::before { content: counter(step); font-family: var(--font-pixel); font-size: 1.1rem; width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 8px; background: var(--accent-soft); color: var(--accent); }
+.step-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.prereq { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 2px; }
+
+/* 指令 */
+.cmd { position: relative; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; }
+.cmd pre { margin: 0; padding: 12px 84px 12px 14px; overflow-x: auto; font-family: var(--font-mono); font-size: 0.86rem; line-height: 1.6; }
+.cmd .copy { position: absolute; top: 8px; right: 8px; font: 500 0.78rem var(--font-body); padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.cmd .copy:hover { border-color: var(--accent); }
+.cmd .copy:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--sunken); padding: 1px 5px; border-radius: 4px; }
+.cmd code { background: none; padding: 0; }
+
+/* 資料位置 */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 500; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.04em; background: var(--sunken); }
+tr:last-child td { border-bottom: none; }
+.git-no { color: var(--accent); white-space: nowrap; }
+.git-yes { color: var(--ok); white-space: nowrap; }
+
+.note { font-size: 0.88rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 18px; }
+@media (prefers-reduced-motion: no-preference) { .avatar { transition: transform 0.2s ease; } .avatar:hover { transform: translateY(-3px); } }
+</style>
+</head>
+<body>
+
+<main class="page">
+  <header class="hero">
+    <img class="avatar" alt="ALICe 的像素頭像" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAByElEQVR4nGMsqtrwnwEKdj6UYCj25QGzW2rSGALCysBsHT0VBnzgyqU7YLqt2g5MV7UegutjhFlwQ9SBQeP1AbAgTAMMELIA2RJ0wESsQnIB3IKHZ25gdbEOEa7Hpw5ugbv8CwwNxBqOzxKMICImyK6gieELVrAFpLoUH0A3i+nciVNwCUotunLpDoZvGEHEvBVX4HmBUgtIjgNKAChEWEAMXR0phstXnmEoaCtPgbOrOudgNQRZjV90BYY82AJ04PLnDEQzA+UAqwUw8DtQCc4Ol7mHVU0jkhpsgGZxoANNkeBUdPrKu/+wOEjkRk0J3wQJu+Htg3cMsvwCKGLzv6qQ54PHyw6BMbLh+ACGD5ABrnDHZfiEawIYQYQ3kmu3/cMqXqD1AcNAXACvBehg6fwmCA3lRyfWEWfB8mWHMGoykCvDvYTQLEDVDFIjrCCE1ccws3D6wKdrMpiOiUlg6O2fz8DLLwHGIPD5I6TuMC2dBBZLS/IE8y+f3smga4rI2fBUdPk09mIAGcAMhQGYhVxsLxmWLFnAsHv3Tqz6CCZTkObiwkSCDsAFmOLjM8BF9fK5iIJqz5ZmOFtcXBLORvcFNoCsF8QGAHMzqWg0hxyVAAAAAElFTkSuQmCC">
+    <div>
+      <h1 class="wordmark">ALIC<span class="e">e</span></h1>
+      <p class="tagline">at your service</p>
+    </div>
+  </header>
+
+  <section>
+    <p class="lede">在你自己電腦上執行的個人助理。她用 Claude Code 的訂閱思考，不用 API 金鑰、不會額外付費；對話、記憶、專案與截圖都存在本機。這一頁是可攜版的介紹，換一台電腦照下面的步驟就能裝起來。原始碼：<a href="https://github.com/zz32569469/ALICe-assistant">github.com/zz32569469/ALICe-assistant</a>。</p>
+    <ul class="chips" aria-label="需求摘要">
+      <li>Windows 已驗證</li>
+      <li>Node.js 20.19 以上</li>
+      <li>Claude Code（claude.ai 訂閱登入）</li>
+      <li>Codex 選用</li>
+      <li>MIT 授權</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>她能做什麼 <span class="tag">FEATURES</span></h2>
+    <div class="features">
+      <div class="feature">
+        <h3>對話</h3>
+        <ul>
+          <li>左邊分「工作」「聊天」兩個分頁，紀錄分開；聊天不帶專案資料，比較省 token。</li>
+          <li>Ctrl+V 貼上或拖曳截圖，她會先看圖再回答。</li>
+          <li>長期記憶：聽到你的偏好會先記成筆記，每天整理一次，過時的會刪掉。</li>
+        </ul>
+      </div>
+      <div class="feature">
+        <h3>專案管理</h3>
+        <ul>
+          <li>每個專案一張卡，進度線（流程可自訂）、任務清單、完成條件與負責的同事 session。</li>
+          <li>同事回報做完時，先跳「進度等你確認」卡片和桌面通知，你按確認才更新。</li>
+          <li>卡片可以收合；右上「更新進度」請她依任務清單核對。</li>
+        </ul>
+      </div>
+      <div class="feature">
+        <h3>日常</h3>
+        <ul>
+          <li>會議：一行登記或在對話裡說，開會前 30 分鐘、10 分鐘各提醒一次。</li>
+          <li>占卜：塔羅牌，今日運勢每天一次、本週運勢每週一次。</li>
+          <li>用量：每次回覆的 token 與訂閱額度。</li>
+        </ul>
+      </div>
+      <div class="feature">
+        <h3>搭配的工具</h3>
+        <ul>
+          <li>Codex 分頁：委派給 Codex 的任務、回報與工作區比對。</li>
+          <li>alice-guard：Claude Code 的 mod，守提交規則、自動帶入角色頁，同事傳給她的訊息直送 Core。</li>
+          <li>Chrome 選取翻譯插件：選字按「譯」，用訂閱額度翻譯。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>新電腦安裝 <span class="tag">SETUP</span></h2>
+    <ol class="steps">
+      <li>
+        <div class="step-body">
+          <h3>事前準備</h3>
+          <ul class="prereq">
+            <li>Node.js 20.19 以上。</li>
+            <li>Claude Code，用 claude.ai 訂閱登入；不要設定任何 API 金鑰。</li>
+            <li>Codex（選用），用 ChatGPT 訂閱登入。沒有的話，寫程式改由 Claude 做。</li>
+            <li>Obsidian，用來開知識庫。</li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>下載並安裝</h3>
+          <p>setup 會安裝並建置 Core 與 Web Studio、建立知識庫範本與本機設定，最後做健康檢查。已存在的檔案不會覆寫。</p>
+          <div class="cmd"><pre><code>git clone https://github.com/zz32569469/ALICe-assistant.git alice
+cd alice
+node scripts/setup.cjs --kb &lt;知識庫要放的資料夾&gt;</code></pre><button class="copy" type="button">複製</button></div>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>啟用 alice-guard</h3>
+          <p>在 <code>~/.claude/settings.json</code> 的 <code>env</code> 加上這一行，路徑換成這台電腦上 <code>mods/alice-guard</code> 的絕對路徑。健康檢查會印出可以直接貼的寫法。</p>
+          <div class="cmd"><pre><code>"CLAUDE_CODE_PLUGIN_DIRS": "C:\\…\\alice\\mods\\alice-guard"</code></pre><button class="copy" type="button">複製</button></div>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>啟動</h3>
+          <p>先開 Core，再另開一個終端機開 Web Studio，第一次會自動登入。</p>
+          <div class="cmd"><pre><code>cd core
+npm start</code></pre><button class="copy" type="button">複製</button></div>
+          <div class="cmd"><pre><code>cd core
+npm run studio</code></pre><button class="copy" type="button">複製</button></div>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>更新與檢查 <span class="tag">MAINTAIN</span></h2>
+    <p>更新會只允許快轉的 <code>git pull</code>，依變動重裝與重新建置，最後做健康檢查並列出要重啟的東西。</p>
+    <div class="cmd"><pre><code>node scripts/update.cjs</code></pre><button class="copy" type="button">複製</button></div>
+    <p>健康檢查列出 Node 版本、建置、本機設定、知識庫與角色頁路徑、登入方式與 alice-guard 的狀態，每一項都附修正方式。</p>
+    <div class="cmd"><pre><code>node scripts/doctor.cjs</code></pre><button class="copy" type="button">複製</button></div>
+  </section>
+
+  <section>
+    <h2>資料放在哪 <span class="tag">LOCAL</span></h2>
+    <p>每台電腦各自獨立。git 裡只有程式、規格與範本，下面這些都留在本機。</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>內容</th><th>位置</th><th>進 git</th></tr></thead>
+        <tbody>
+          <tr><td>對話、專案卡、會議、占卜、用量</td><td><code>data/alice.db</code></td><td class="git-no">不進</td></tr>
+          <tr><td>貼上的截圖</td><td><code>data/uploads/</code></td><td class="git-no">不進</td></tr>
+          <tr><td>事實檔與 ALICe 記住的事</td><td><code>memory/facts.md</code></td><td class="git-no">不進</td></tr>
+          <tr><td>記憶整理前的備份</td><td><code>data/memory-backups/</code></td><td class="git-no">不進</td></tr>
+          <tr><td>本機設定（知識庫、專案路徑）</td><td><code>alice.local.json</code></td><td class="git-no">不進</td></tr>
+          <tr><td>alice-guard 設定</td><td><code>mods/alice-guard/guard.local.json</code></td><td class="git-no">不進</td></tr>
+          <tr><td>程式、範本、說明文件</td><td><code>core/</code> <code>studio/</code> <code>scripts/</code> <code>docs/</code></td><td class="git-yes">進</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="note">專案卡內建一條通用流程（規劃 → 進行中 → 驗證 → 完成）；團隊自己的流程寫在本機的流程設定檔，格式見 repo 的 docs/spec-projects.md。目前只在 Windows 驗證過；程式有 macOS／Linux 的分支，但還沒實測。最後一次在全新 clone 上完整安裝並啟動是 2026-10-12。</p>
+</main>
+
+<script>
+for (const button of document.querySelectorAll(".cmd .copy")) {
+  button.addEventListener("click", async () => {
+    const code = button.parentElement.querySelector("code");
+    const text = code.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = "已複製";
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(code);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      button.textContent = "已選取，按 Ctrl+C";
+    }
+    setTimeout(() => { button.textContent = "複製"; }, 1800);
+  });
+}
+</script>
+</body>
+</html>
