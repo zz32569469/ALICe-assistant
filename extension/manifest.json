@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "ALICE 選取翻譯",
+  "version": "1.1.0",
+  "description": "選取文字後按「譯」或 Alt+T，由本機的 ALICE Core（Claude 訂閱）翻譯，結果顯示在選取的文字旁邊。",
+  "permissions": ["storage"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "action": { "default_title": "ALICE 選取翻譯（點右鍵 → 選項 可設定 token）" }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "alice-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Alice Core：本機常駐的 Alice Agent 服務",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/main.js",
+    "chat": "tsc -p tsconfig.json && node dist/src/cli/chat.js",
+    "studio": "tsc -p tsconfig.json && node dist/src/cli/studio.js",
+    "eval:persona": "tsc -p tsconfig.json && node dist/src/eval/personaEval.js",
+    "test": "tsc -p tsconfig.json && node dist/test/all.test.js"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^20.19.43",
+    "@types/ws": "^8.18.1",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "ws": "^8.22.0"
+  }
+}

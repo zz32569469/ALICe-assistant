@@ -1,0 +1,29 @@
+{
+  "teamRepos": [
+    "team-repo-a",
+    "team-repo-b"
+  ],
+  "vault": "C:/path/to/knowledge-vault",
+  "roles": [
+    {
+      "name": "知識庫管理員",
+      "path": "C:/path/to/knowledge-vault",
+      "page": "C:/path/to/knowledge-vault/wiki/roles/manager.md"
+    },
+    {
+      "name": "開發工程師",
+      "repo": "team-repo-a",
+      "page": "C:/path/to/knowledge-vault/wiki/roles/dev.md"
+    },
+    {
+      "name": "文件工程師",
+      "repo": "team-repo-b",
+      "page": "C:/path/to/knowledge-vault/wiki/roles/docs.md"
+    }
+  ],
+  "alice": {
+    "name": "ALICE",
+    "url": "http://127.0.0.1:7788",
+    "tokenPath": "C:/Users/<你>/AppData/Roaming/alice/token"
+  }
+}

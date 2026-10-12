@@ -1,0 +1,4 @@
+{
+  "description": "alice-guard 的 hooks module",
+  "modules": ["./register.js"]
+}

@@ -1,0 +1,18 @@
+node_modules/
+*.db
+*.db-journal
+.env
+dist/
+data/
+memory/facts.md
+kb-template-staging/
+alice.local.json
+docs/艾莉絲的建議.md
+
+# alice-guard mod：本機設定與 Claude Code 自動產生的型別檔
+mods/*/guard.local.json
+mods/*/.claude-plugin/types/
+mods/*/tsconfig.json
+
+# 本機的團隊流程、公司字眼清單、規劃紀錄（不進 git）
+local/

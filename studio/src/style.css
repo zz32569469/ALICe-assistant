@@ -1,0 +1,169 @@
+/* ALICE Web Studio：參謀的工作手帳。冷調紙灰＋墨色字，玫瑰色只給 ALICE 與主要動作，琥珀＝等你處理。 */
+:root {
+  --bg: #f3f4f6;
+  --panel: #ffffff;
+  --sunken: #eceef2;
+  --text: #1c2029;
+  --muted: #646b78;
+  --faint: #959cab;
+  --border: #e1e4ea;
+  --border-strong: #cdd2db;
+  --accent: #a6416a;
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+  --owner-bg: #262c38;
+  --owner-text: #f4f5f8;
+  --on-accent: #ffffff;
+  --ok: #2f7d57;
+  --warn: #9a5b0e;
+  --warn-bg: #fbf0dc;
+  --danger: #bf3a2b;
+  --danger-bg: #fbe7e4;
+  /* 舊名稱：其他元件仍在用。 */
+  --card: var(--panel);
+  --user-bg: var(--sunken);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-bubble: 16px 16px 4px 16px;
+  --bw: 1px;
+  --card-shadow: none;
+  --font-display: var(--font-sans);
+  --shadow: 0 1px 2px rgb(20 24 33 / 6%), 0 4px 16px rgb(20 24 33 / 5%);
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+  /* 主題把 --font-sans 換成像素字時，次要小字仍用一般字型（§44）。 */
+  --font-plain: "Segoe UI Variable Text", "Segoe UI", "Microsoft JhengHei UI", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-plain-mono: "Cascadia Mono", Consolas, "Microsoft JhengHei UI", "Microsoft JhengHei", monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111318;
+    --panel: #181b21;
+    --sunken: #1f232b;
+    --text: #e4e6ec;
+    --muted: #a0a7b4;
+    --faint: #6f7684;
+    --border: #2a2f39;
+    --border-strong: #3a404c;
+    --accent: #e3789c;
+    --owner-bg: #343d50;
+    --owner-text: #eef0f5;
+    --on-accent: #22111a;
+    --ok: #5cbf8c;
+    --warn: #e0a54a;
+    --warn-bg: #33281a;
+    --danger: #ef7466;
+    --danger-bg: #3a1f1c;
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 20px rgb(0 0 0 / 25%);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--app-bg, var(--bg));
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+#app { height: 100%; }
+::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: var(--bw) solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+button.primary:hover:not(:disabled) { color: var(--on-accent); background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
+button.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+button.danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+button.link { border: none; background: none; padding: 0 4px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+
+textarea, input {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: var(--bw) solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+}
+textarea::placeholder, input::placeholder { color: var(--faint); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea:focus-visible, input:focus-visible { outline-offset: 0; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.85em; }
+.error { color: var(--danger); }
+.warn { background: var(--warn-bg); color: var(--text); border-radius: 8px; padding: 6px 10px; border-left: 3px solid var(--warn); }
+.warn-text { color: var(--danger); }
+.num, time { font-variant-numeric: tabular-nums; }
+
+/* 狀態標籤：小圓點＋文字。 */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 8px 1px 7px; border-radius: 999px;
+  font-size: 0.78em; line-height: 1.6; white-space: nowrap;
+  background: var(--sunken); color: var(--muted);
+}
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.85; }
+.badge.running, .badge.open, .badge.queued { background: var(--accent-soft); color: var(--accent); }
+.badge.completed, .badge.done, .badge.closed { background: color-mix(in srgb, var(--ok) 13%, transparent); color: var(--ok); }
+.badge.paused, .badge.pending_approval, .badge.writeback, .badge.warn { background: var(--warn-bg); color: var(--warn); border: none; padding: 1px 8px 1px 7px; }
+.badge.failed, .badge.cancelled, .badge.rejected, .badge.expired, .badge.danger { background: var(--danger-bg); color: var(--danger); }
+
+/* Markdown：長篇中文閱讀。 */
+.md { overflow-wrap: anywhere; line-height: 1.75; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 6px 0; }
+.md h2, .md h3, .md h4, .md h5, .md h6 { margin: 16px 0 6px; line-height: 1.4; }
+.md h2 { font-size: 1.12em; }
+.md h3 { font-size: 1.04em; }
+.md h4, .md h5, .md h6 { font-size: 0.98em; color: var(--muted); }
+.md strong { font-weight: 650; }
+.md ul, .md ol { margin: 6px 0; padding-left: 1.4em; }
+.md li { margin: 2px 0; }
+.md li::marker { color: var(--faint); }
+.md li.nested { margin-left: 16px; }
+.md code { font-family: var(--font-mono); background: var(--sunken); border-radius: 4px; padding: 1px 5px; font-size: 0.86em; }
+.md pre { background: var(--sunken); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; line-height: 1.55; }
+.md pre code { background: none; padding: 0; }
+.md blockquote { margin: 6px 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--border-strong); color: var(--muted); }
+.md-table { overflow-x: auto; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; }
+.md table { border-collapse: collapse; font-size: 0.9em; width: max-content; min-width: 100%; line-height: 1.55; }
+.md th { white-space: nowrap; font-weight: 600; background: var(--sunken); }
+.md td { max-width: 28em; }
+.md th, .md td { border-bottom: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+.md tr:last-child td { border-bottom: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+
+/* 工作面板共用：上方清單、下方詳情。 */
+.pick-list { list-style: none; margin: 0; padding: 8px; overflow-y: auto; border-bottom: 1px solid var(--border); }
+.pick-list > li.muted { padding: 8px 10px; }
+.pick-row {
+  width: 100%; text-align: left; background: none; border: none; border-radius: 8px; padding: 8px 10px;
+}
+.pick-row:hover:not(:disabled) { background: var(--sunken); color: inherit; }
+.pick-row.active { background: var(--panel); box-shadow: inset 3px 0 0 var(--accent), var(--shadow); }
+.pick-detail { overflow-y: auto; padding: 14px 16px; background: var(--panel); }
+.pick-detail h3 { margin: 0 0 6px; font-size: 1.05em; line-height: 1.4; }
+.pick-hint { margin: 0; padding: 24px 16px; text-align: center; color: var(--muted); }
+.toolbar { display: flex; gap: 10px; align-items: center; padding: 10px 14px; flex-wrap: wrap; }

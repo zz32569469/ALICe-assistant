@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>ALICE 選取翻譯 設定</title>
+  <style>
+    :root { color-scheme: light dark; --accent: #a6416a; }
+    body { font-family: "Segoe UI", "Microsoft JhengHei UI", "Microsoft JhengHei", system-ui, sans-serif; max-width: 560px; margin: 32px auto; padding: 0 16px; line-height: 1.6; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p { margin: 4px 0 14px; }
+    .muted { color: #6b7280; font-size: 13px; }
+    label { display: block; font-weight: 600; margin-top: 14px; }
+    input { width: 100%; padding: 7px 9px; font: inherit; border: 1px solid #c9ced6; border-radius: 6px; margin-top: 4px; box-sizing: border-box; }
+    .row { display: flex; gap: 8px; margin-top: 18px; }
+    button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid #c9ced6; background: none; cursor: pointer; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    #status { margin-top: 14px; white-space: pre-wrap; }
+    code { background: rgb(127 127 127 / 15%); padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>ALICE 選取翻譯</h1>
+  <p class="muted">選取網頁上的文字，按旁邊的「譯」或 Alt+T，翻譯結果會出現在右下角。翻譯由本機的 ALICE Core 用 Claude 訂閱完成，不用 API、不用另外付費；Core 要在執行中。</p>
+
+  <label for="coreUrl">ALICE Core 網址</label>
+  <input id="coreUrl" placeholder="http://127.0.0.1:7788">
+
+  <label for="token">Token</label>
+  <input id="token" type="password" autocomplete="off" placeholder="貼上 token">
+  <p class="muted">在 <code>%APPDATA%\alice\token</code>（檔案總管網址列貼上這段就能打開資料夾），用記事本開 <code>token</code> 檔，整串複製貼上。只存在這台電腦的 Chrome 裡。</p>
+
+  <div class="row">
+    <button class="primary" id="save">儲存</button>
+    <button id="test">儲存並測試</button>
+  </div>
+  <div id="status"></div>
+  <script src="options.js"></script>
+</body>
+</html>

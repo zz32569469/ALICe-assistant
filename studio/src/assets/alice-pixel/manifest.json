@@ -1,0 +1,285 @@
+{
+  "name": "alice_pixel",
+  "frame_width": 48,
+  "frame_height": 43,
+  "scale": 1,
+  "rendering": "放大時用 nearest-neighbor（CSS image-rendering: pixelated），不要平滑",
+  "directions": [
+    "down",
+    "left",
+    "right",
+    "up"
+  ],
+  "direction_notes": {
+    "down": "正面（面向畫面）",
+    "left": "側面，臉朝畫面左",
+    "right": "側面，臉朝畫面右",
+    "up": "背面（背對畫面）"
+  },
+  "layout": "每個動作一張 sheet；一列是一個方向（順序同 directions），一欄是一幀，從左上角 (0,0) 開始每格 48×43",
+  "anchor": {
+    "x": 24,
+    "y": 41,
+    "note": "站立基準點：畫布水平中央、鞋底（第 40 列）正下方的那條線。把這一點對到地面就好；四個方向、每一幀都用同一個基準點，動畫裡腳的起落已經畫在格子裡（走路時著地的腳可能往下到第 41 列），播放時不要再另外移動圖片。"
+  },
+  "ground_shadow": {
+    "included_in": "<動作>.png",
+    "color": "#d2cde2",
+    "opaque": true,
+    "no_shadow_variant": "<動作>_noshadow.png（只把陰影色改成透明，其他像素相同）",
+    "note": "陰影是不透明的淡紫色，配合淺色背景 #ebe8f2 設計；深色背景建議用 _noshadow 版，自己畫半透明橢圓（約 x 16–31、y 37–41）"
+  },
+  "animations": {
+    "idle": {
+      "file": "idle.png",
+      "file_noshadow": "idle_noshadow.png",
+      "description": "待機：呼吸（一次約 2.9 秒）＋每兩次呼吸眨一次眼；背面看不到臉，眨眼那幾幀只是停住",
+      "rows": {
+        "down": 0,
+        "left": 1,
+        "right": 2,
+        "up": 3
+      },
+      "frames": 20,
+      "loop": true,
+      "durations_ms": [
+        900,
+        180,
+        180,
+        180,
+        700,
+        180,
+        180,
+        180,
+        180,
+        400,
+        130,
+        370,
+        180,
+        180,
+        180,
+        700,
+        180,
+        180,
+        180,
+        180
+      ],
+      "total_ms": 5720,
+      "frame_notes": {
+        "0": "站好（最高點）",
+        "4": "最低點",
+        "10": "閉眼（正面、側面）"
+      }
+    },
+    "walk": {
+      "file": "walk.png",
+      "file_noshadow": "walk_noshadow.png",
+      "description": "走路：6 幀、左右各一步；上半身穩、晃動小",
+      "rows": {
+        "down": 0,
+        "left": 1,
+        "right": 2,
+        "up": 3
+      },
+      "frames": 6,
+      "loop": true,
+      "durations_ms": [
+        160,
+        160,
+        160,
+        160,
+        160,
+        160
+      ],
+      "total_ms": 960,
+      "ms_per_frame": 160,
+      "ms_range": [
+        160,
+        200
+      ],
+      "frame_notes": {
+        "0": "一腳經過（抬起）",
+        "1": "著地",
+        "2": "下沉",
+        "3": "另一腳經過",
+        "4": "著地",
+        "5": "下沉"
+      }
+    },
+    "sleep": {
+      "file": "sleep.png",
+      "file_noshadow": "sleep_noshadow.png",
+      "description": "睡覺（站著睡）：閉眼、低頭（只在臉上表現：瀏海蓋下來、眼睛和嘴巴往下）、呼吸比待機慢；一輪內越睡越低，最後頭慢慢浮回，不驚醒（一輪約 8.6 秒）",
+      "rows": {
+        "down": 0,
+        "left": 1,
+        "right": 2,
+        "up": 3
+      },
+      "frames": 51,
+      "loop": true,
+      "durations_ms": [
+        210,
+        210,
+        210,
+        210,
+        210,
+        210,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        245,
+        245,
+        245,
+        245,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        210,
+        210,
+        210,
+        210,
+        210,
+        210,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        245,
+        245,
+        245,
+        245,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        126,
+        200,
+        200,
+        200
+      ],
+      "total_ms": 8608,
+      "overlay": {
+        "file": "sleep_fx.png",
+        "description": "zzz 特效（蝴蝶結緞帶的藍色）：z 從頭旁邊冒出、越飄越大後消失",
+        "note": "和 sleep.png 同樣排法、同樣的幀數與時間，一格對一格畫在角色上面；z 不會蓋到角色，可以不用（Studio 自己畫 z 也行）。z 的位置：正面右上、側面在臉那一側、背面左上（避開蝴蝶結）"
+      },
+      "note": "停很久的姿勢被切成不超過 250 毫秒的小格（姿勢相同），讓 z 每一小格都能往上飄；只播角色時也照 durations_ms 播即可"
+    },
+    "typing": {
+      "file": "typing.png",
+      "file_noshadow": "typing_noshadow.png",
+      "description": "坐在桌前用筆電打字（45 度斜前方，臉朝畫面右）：手上下敲、偶爾移到鍵盤另一邊，停下來時眨眼",
+      "rows": {
+        "front_right": 0
+      },
+      "frames": 20,
+      "loop": true,
+      "durations_ms": [
+        300,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        500,
+        120,
+        300,
+        90,
+        90,
+        90,
+        90,
+        600,
+        120,
+        300
+      ],
+      "total_ms": 3410,
+      "note": "這是一個場景（含桌子、白色椅背、筆電），不是四方向動作：只有 front_right 一列。桌板下緣在第 40 列，基準點和其他動作相同；角色比站姿靠右、畫面左右都有家具，播放時不要再另外移動或翻轉（翻轉會讓光源和蝴蝶結跑到另一邊）。",
+      "frame_notes": {
+        "0": "手放在鍵盤上",
+        "10": "停下來看螢幕",
+        "11": "眨眼"
+      }
+    },
+    "drink": {
+      "file": "drink.png",
+      "file_noshadow": "drink_noshadow.png",
+      "description": "喝一口咖啡（打字場景，45 度斜前方）：手從鍵盤伸到桌上的馬克杯、舉到嘴前、閉眼喝一口、放回去",
+      "rows": {
+        "front_right": 0
+      },
+      "frames": 11,
+      "loop": false,
+      "durations_ms": [
+        300,
+        180,
+        160,
+        180,
+        200,
+        700,
+        300,
+        250,
+        180,
+        180,
+        300
+      ],
+      "total_ms": 2930,
+      "note": "和 typing 同一個場景，播一次就回到 typing。第一格和最後一格就是 typing 的第 0 格：在 typing 播到第 0 格時切過來、播完再接回 typing 第 0 格，畫面不會跳。",
+      "frame_notes": {
+        "1": "手伸到杯子",
+        "3": "拿到胸前",
+        "4": "杯子到嘴前",
+        "5": "閉眼喝一口",
+        "9": "放回桌上"
+      }
+    }
+  },
+  "avatar": {
+    "avatar_32": {
+      "file": "avatar_32.png",
+      "source": "idle.png 的 down 第 0 格",
+      "crop": {
+        "x": 7,
+        "y": 1,
+        "w": 32,
+        "h": 32
+      },
+      "note": "頭部＋肩膀（整個頭和蝴蝶結都在框內）"
+    },
+    "avatar_24": {
+      "file": "avatar_24.png",
+      "source": "idle.png 的 down 第 0 格",
+      "crop": {
+        "x": 11,
+        "y": 7,
+        "w": 24,
+        "h": 24
+      },
+      "note": "臉部特寫（瀏海、眼睛、腮紅、嘴巴）"
+    }
+  },
+  "directions_note": "待機、走路、睡覺有四個方向；打字（typing）和喝咖啡（drink）只有 front_right 一個角度",
+  "palette": "palette.json",
+  "docs": [
+    "README.md",
+    "STYLE_RULES.md",
+    "alice_three_view_spec.md"
+  ]
+}

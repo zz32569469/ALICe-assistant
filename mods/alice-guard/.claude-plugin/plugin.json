@@ -1,0 +1,6 @@
+{
+  "name": "alice-guard",
+  "version": "0.1.0",
+  "description": "ALICE 的守門 mod：團隊 repo 提交規則、知識庫唯讀、依資料夾自動帶入角色指引",
+  "author": { "name": "zz32569469" }
+}

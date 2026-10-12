@@ -1,0 +1,43 @@
+{
+  "knowledgeBase": {
+    "path": "C:/Users/<你>/Documents/knowledge-base",
+    "summaryPage": "wiki/AI 協作/艾莉絲摘要.md",
+    "rolesDir": "wiki/AI 協作/角色"
+  },
+  "codex": {
+    "available": true
+  },
+  "workerTimeoutMin": 5,
+  "dispatch": false,
+  "projects": [
+    {
+      "name": "知識庫",
+      "path": "C:/Users/<你>/Documents/knowledge-base",
+      "role": "知識庫管理員",
+      "readDirs": [],
+      "session": "Library"
+    },
+    {
+      "name": "工具專案",
+      "path": "C:/Users/<你>/workspace/<工具 repo>",
+      "role": "專案工程師",
+      "readDirs": ["C:/Users/<你>/workspace/<專案紀錄資料夾>"],
+      "session": "<Project> - dev",
+      "writable": true,
+      "testCommands": ["npx vue-tsc --noEmit", "npm test"],
+      "highRiskPatterns": ["**/*.xls", "**/*.xlsx", "docs/**", "**/*spec*", "**/config/**", "**/*.config.*", "src/core/**"],
+      "forbiddenPatterns": ["xls/**", "shared-lib/**"],
+      "watchPaths": ["shared-lib"],
+      "claudeFallback": "ask",
+      "changeLogDraft": true
+    },
+    {
+      "name": "alice-sandbox",
+      "path": "C:/Users/<你>/workspace/alice-sandbox",
+      "role": "專案工程師",
+      "readDirs": [],
+      "writable": true,
+      "testCommands": ["npm test"]
+    }
+  ]
+}

@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex 任務看板</title>
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --panel-2: #f9fafb; --line: #e3e6ea; --text: #1d2330; --muted: #6b7280;
+  --accent: #4f46e5; --ok: #16a34a; --ok-bg: #e8f7ee; --fail: #dc2626; --fail-bg: #fdecec;
+  --run: #2563eb; --run-bg: #e8f0fe; --warn: #b45309; --warn-bg: #fef3e2; --code: #eef0f4;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1c2029; --line: #2a2f3a; --text: #e6e8ee; --muted: #9aa3b2;
+    --accent: #8b87ff; --ok: #4ade80; --ok-bg: #12291c; --fail: #f87171; --fail-bg: #2c1515;
+    --run: #60a5fa; --run-bg: #132238; --warn: #fbbf24; --warn-bg: #2b2210; --code: #232834;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.55 "Segoe UI", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif; }
+code, pre, .mono { font-family: "Cascadia Code", Consolas, "Courier New", monospace; }
+button { font: inherit; color: inherit; }
+
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+  padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5;
+}
+header h1 { font-size: 17px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.conn { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.conn.on { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-bg); }
+.stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat { padding: 3px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; }
+.stat b { font-variant-numeric: tabular-nums; }
+.spacer { flex: 1; }
+.updated { color: var(--muted); font-size: 12px; }
+.quota { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; }
+.quota .q { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); }
+.quota .bar { width: 60px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.quota .bar i { display: block; height: 100%; background: var(--ok); }
+.quota .q.warn .bar i { background: var(--warn); }
+.quota .q.low .bar i { background: var(--fail); }
+.quota .q.low b { color: var(--fail); }
+.quota b { font-variant-numeric: tabular-nums; }
+.quota small { color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px 0; }
+.chip { border: 1px solid var(--line); background: var(--panel); padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.search { flex: 1 1 200px; max-width: 320px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); }
+
+main { display: grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 16px; padding: 12px 20px 20px; height: calc(100vh - 110px); }
+main > section { min-width: 0; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; height: auto; } }
+
+.list { overflow: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+.card {
+  position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px 10px 16px; cursor: pointer; box-shadow: var(--shadow); text-align: left; width: 100%;
+}
+.card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; border-radius: 10px 0 0 10px; background: var(--muted); }
+.card.completed::before { background: var(--ok); }
+.card.failed::before, .card.error::before, .card.cancelled::before { background: var(--fail); }
+.card.running::before { background: var(--run); animation: pulse 1.4s ease-in-out infinite; }
+.card[aria-selected="true"] { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -1px; }
+@keyframes pulse { 50% { opacity: .35; } }
+.card .top { display: flex; align-items: center; gap: 8px; }
+.card .label { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .meta { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.card .last { margin-top: 6px; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; font-weight: 600; }
+.badge.completed { background: var(--ok-bg); color: var(--ok); }
+.badge.failed, .badge.error, .badge.cancelled { background: var(--fail-bg); color: var(--fail); }
+.badge.running { background: var(--run-bg); color: var(--run); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.ro { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+.badge.role { background: var(--panel-2); color: var(--accent); border: 1px solid var(--line); font-weight: 600; }
+
+.detail { overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.empty { color: var(--muted); padding: 40px; text-align: center; }
+.d-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--line); }
+.d-head h2 { margin: 0 0 6px; font-size: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.d-meta { color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.d-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.btn { border: 1px solid var(--line); background: var(--panel-2); padding: 4px 12px; border-radius: 8px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+
+.stepper { display: flex; gap: 0; margin: 14px 0 4px; }
+.step { flex: 1; text-align: center; font-size: 12px; color: var(--muted); position: relative; padding-top: 18px; }
+.step::before { content: ""; position: absolute; top: 5px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--line); z-index: 1; }
+.step::after { content: ""; position: absolute; top: 10px; left: -50%; width: 100%; height: 2px; background: var(--line); }
+.step:first-child::after { display: none; }
+.step.done { color: var(--text); }
+.step.done::before, .step.done::after { background: var(--ok); }
+.step.now { color: var(--run); font-weight: 600; }
+.step.now::before { background: var(--run); box-shadow: 0 0 0 4px var(--run-bg); animation: pulse 1.4s infinite; }
+.step.now::after { background: var(--ok); }
+.step.bad { color: var(--fail); font-weight: 600; }
+.step.bad::before { background: var(--fail); }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.kpi { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.kpi .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi .k { font-size: 12px; color: var(--muted); }
+.kpis.tok { padding-top: 0; }
+.kpis.tok > .k { font-size: 12px; }
+
+.alert { margin: 12px 20px 0; padding: 10px 12px; border-radius: 8px; }
+.alert.fail { background: var(--fail-bg); color: var(--fail); }
+.alert.warn { background: var(--warn-bg); color: var(--warn); }
+
+.tabs { display: flex; gap: 4px; padding: 10px 20px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tab { border: 0; background: none; padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); }
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.pane { padding: 14px 20px 24px; }
+
+.tl-opts { display: flex; gap: 14px; align-items: center; color: var(--muted); font-size: 12.5px; margin-bottom: 8px; flex-wrap: wrap; }
+.tl { list-style: none; margin: 0; padding: 0; }
+.tl > li { display: grid; grid-template-columns: 64px 22px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); align-items: start; }
+.tl > li > .time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.tl > li > .ico { text-align: center; }
+.tl > li > .txt { min-width: 0; overflow-wrap: anywhere; }
+.tl > li.cmd > .txt, .tl > li.cmd-ok > .txt, .tl > li.cmd-fail > .txt { font-family: "Cascadia Code", Consolas, monospace; font-size: 12.5px; color: var(--muted); }
+.tl > li.cmd-fail > .txt { color: var(--fail); }
+.tl > li.error > .txt { color: var(--fail); font-weight: 600; }
+.tl > li.edit > .txt { color: var(--warn); font-weight: 600; }
+.tl > li.msg > .txt { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+
+.md { overflow-wrap: anywhere; }
+.md h1, .md h2, .md h3, .md h4 { margin: 14px 0 6px; font-size: 15px; }
+.md h2 { font-size: 16px; }
+.md p { margin: 6px 0; }
+.md ul { margin: 4px 0; padding-left: 20px; }
+.md code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .92em; }
+.md pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow: auto; }
+.md pre code { background: none; padding: 0; }
+.md .tablewrap { overflow-x: auto; margin: 8px 0; max-width: 100%; }
+.md table { border-collapse: collapse; width: max-content; min-width: 100%; max-width: none; }
+.md th, .md td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; overflow-wrap: normal; word-break: normal; min-width: 5em; max-width: 42em; }
+.md td code, .md th code { white-space: nowrap; }
+.md th { background: var(--panel-2); }
+pre.plain { white-space: pre-wrap; background: var(--code); padding: 12px; border-radius: 8px; font-size: 12.5px; margin: 0; }
+.muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="conn" id="conn" title="與看板伺服器的連線"></span>Codex 任務看板</h1>
+  <div class="stats" id="stats"></div>
+  <div class="spacer"></div>
+  <div class="quota" id="quota" aria-label="Codex 剩餘額度"></div>
+  <span class="updated" id="updated"></span>
+</header>
+
+<div class="toolbar" role="toolbar">
+  <button class="chip" data-f="all" aria-pressed="true">全部</button>
+  <button class="chip" data-f="running" aria-pressed="false">執行中</button>
+  <button class="chip" data-f="completed" aria-pressed="false">完成</button>
+  <button class="chip" data-f="failed" aria-pressed="false">失敗</button>
+  <input class="search" id="q" type="search" placeholder="搜尋任務名稱、repo、jobId">
+</div>
+
+<main>
+  <section class="list" id="list" aria-label="任務清單"></section>
+  <section class="detail" id="detail" aria-live="polite"><div class="empty">從左側選一個任務</div></section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const FAILED = new Set(['failed', 'error', 'cancelled']);
+const STATUS_TEXT = { completed: '完成', failed: '失敗', error: '錯誤', cancelled: '已取消', running: '執行中', queued: '排隊中' };
+const PHASE_TEXT = { starting: '啟動中', running: '執行中', editing: '修改檔案', verifying: '驗證中', done: '結束', failed: '失敗' };
+const ICON = { msg: '💬', cmd: '▶', 'cmd-ok': '✔', 'cmd-fail': '✖', edit: '📝', 'edit-done': '📝', error: '⛔', done: '🏁', final: '📄', info: '•' };
+const STALL_MIN = 4;
+
+let jobs = [];
+let selected = decodeURIComponent(location.hash.slice(1)) || null;
+let filter = 'all';
+let tab = 'timeline';
+let showCmds = true;
+let followTail = true;
+let detailData = null;
+let detailTimer = null;
+
+const isRunning = j => !['completed', 'failed', 'error', 'cancelled'].includes(j.rawStatus);
+const bucket = j => (isRunning(j) ? 'running' : FAILED.has(j.status) ? 'failed' : 'completed');
+const fmtTime = t => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+const hms = t => (t ? new Date(t).toLocaleTimeString('zh-TW', { hour12: false }) : '');
+function elapsed(j) {
+  const end = j.completedAt ? new Date(j.completedAt) : new Date();
+  const s = Math.max(0, Math.round((end - new Date(j.startedAt)) / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`;
+}
+function ago(t) {
+  if (!t) return '';
+  const s = Math.round((Date.now() - new Date(t)) / 1000);
+  if (s < 60) return `${s} 秒前`;
+  if (s < 3600) return `${Math.floor(s / 60)} 分鐘前`;
+  return `${Math.floor(s / 3600)} 小時前`;
+}
+const fmtTok = n => (n == null ? '—' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n));
+const tokTip = t => `輸入 ${t.input.toLocaleString()}（未快取 ${t.uncached.toLocaleString()}）｜輸出 ${t.output.toLocaleString()}`;
+// 額度變化：回合開始前（或第一筆）到最後一筆的已用百分比差；同時段其他 Codex 對話也會算進去
+const quotaDelta = p => (p && p[0] != null && p[1] != null ? p[1] - p[0] : null);
+const roleName = j => (j.by ? j.by.role || '未對應角色' : '');
+const roleTip = j => (j.by ? `委派 session：${j.by.session || '（未命名）'}\n目錄：${j.by.cwd}` : '');
+const roleBadge = j => (j.by ? `<span class="badge role" title="${esc(roleTip(j))}">👤 ${esc(roleName(j))}</span>` : '');
+const short = j => (j.label.startsWith(j.repo + '：') ? j.label.slice(j.repo.length + 1) : j.label);
+const stalled = j => isRunning(j) && j.lastEventAt && (Date.now() - new Date(j.lastEventAt)) / 60000 > STALL_MIN;
+
+function badge(j) {
+  if (isRunning(j)) return `<span class="badge running">${esc(PHASE_TEXT[j.phase] || STATUS_TEXT.running)}</span>`;
+  return `<span class="badge ${esc(j.status)}">${esc(STATUS_TEXT[j.status] || j.status)}</span>`;
+}
+
+// Codex 剩餘額度（資料來自最近一次 Codex 回應時的 rate_limits，Codex 沒在跑時不會更新）
+let quota = null;
+function renderQuota() {
+  const el = $('#quota');
+  if (!quota) {
+    el.innerHTML = '<span class="q"><small>Codex 額度：尚無資料</small></span>';
+    return;
+  }
+  const pad = n => String(n).padStart(2, '0');
+  const when = sec => {
+    const d = new Date(sec * 1000);
+    const sameDay = d.toDateString() === new Date().toDateString();
+    return (sameDay ? '' : `${d.getMonth() + 1}/${d.getDate()} `) + `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const chip = (name, w) => {
+    if (!w) return '';
+    const reset = Number(w.resets_at) || 0;
+    const expired = reset && reset * 1000 <= Date.now();
+    const left = expired ? 100 : Math.max(0, Math.round(100 - Number(w.used_percent || 0)));
+    const cls = left < 20 ? 'low' : left < 40 ? 'warn' : '';
+    const tip = expired ? '已過重置時間（尚無新資料，視為 100%）' : `已用 ${w.used_percent}%，${when(reset)} 重置`;
+    return `<span class="q ${cls}" title="${esc(tip)}">${esc(name)} <span class="bar"><i style="width:${left}%"></i></span><b>${left}%</b>` +
+      (reset && !expired ? `<small>${esc(when(reset))} 重置</small>` : '') + '</span>';
+  };
+  const label = w => (!w ? '' : w.window_minutes >= 1440 ? '每週' : `${Math.round(w.window_minutes / 60)} 小時`);
+  const at = quota.at ? new Date(quota.at) : null;
+  el.innerHTML =
+    chip(label(quota.primary), quota.primary) +
+    chip(label(quota.secondary), quota.secondary) +
+    (at ? `<small title="最近一次 Codex 回應的時間">資料 ${pad(at.getHours())}:${pad(at.getMinutes())}</small>` : '');
+}
+
+function renderStats() {
+  const c = { running: 0, completed: 0, failed: 0 };
+  jobs.forEach(j => c[bucket(j)]++);
+  $('#stats').innerHTML =
+    `<span class="stat">⏳ 執行中 <b>${c.running}</b></span>` +
+    `<span class="stat">✅ 完成 <b>${c.completed}</b></span>` +
+    `<span class="stat">❌ 失敗 <b>${c.failed}</b></span>`;
+  document.title = c.running ? `(${c.running} 執行中) Codex 任務看板` : 'Codex 任務看板';
+}
+
+function renderList() {
+  const q = $('#q').value.trim().toLowerCase();
+  const rows = jobs.filter(j => (filter === 'all' || bucket(j) === filter) && (!q || `${j.label} ${j.repo} ${j.id} ${roleName(j)} ${j.by?.session || ''}`.toLowerCase().includes(q)));
+  $('#list').innerHTML = rows.length
+    ? rows
+        .map(
+          j => `<button class="card ${isRunning(j) ? 'running' : esc(j.status)}" data-id="${esc(j.id)}" aria-selected="${j.id === selected}">
+  <div class="top"><span class="label" title="${esc(j.label)}">${esc(short(j))}</span>${badge(j)}</div>
+  <div class="meta">${roleBadge(j)}<span>${esc(j.repo)}</span><span>${fmtTime(j.startedAt)}</span><span class="mono" data-elapsed="${esc(j.id)}">⏱ ${elapsed(j)}</span>${j.tokens ? `<span class="mono" title="${esc(tokTip(j.tokens))}">🪙 ${fmtTok(j.tokens.input)}</span>` : ''}${j.write ? '' : '<span class="badge ro">唯讀</span>'}${stalled(j) ? `<span class="badge warn">${Math.floor((Date.now() - new Date(j.lastEventAt)) / 60000)} 分鐘無動作</span>` : ''}</div>
+  <div class="last">${j.failReason ? '⛔ ' + esc(j.failReason) : j.lastEvent ? `${ICON[j.lastEvent.kind] || '•'} ${esc(j.lastEvent.text)}` : ''}</div>
+</button>`
+        )
+        .join('')
+    : '<div class="empty">沒有符合的任務</div>';
+}
+
+function stepper(d) {
+  const order = ['start', 'running', 'editing', 'verifying', 'done'];
+  const names = { start: '建立', running: '執行', editing: '修改檔案', verifying: '驗證', done: '結束' };
+  let cur = isRunning(d) ? ({ starting: 'start', running: 'running', editing: 'editing', verifying: 'verifying' }[d.phase] || 'running') : 'done';
+  const idx = order.indexOf(cur);
+  const bad = !isRunning(d) && d.status !== 'completed';
+  return `<div class="stepper">${order
+    .map((s, i) => {
+      let cls = i < idx ? 'done' : i === idx ? (cur === 'done' ? (bad ? 'bad' : 'done') : 'now') : '';
+      const label = s === 'done' && !isRunning(d) ? (bad ? '失敗' : '完成') : names[s];
+      return `<div class="step ${cls}">${label}</div>`;
+    })
+    .join('')}</div>`;
+}
+
+// 極簡 markdown：標題、清單、表格、程式碼區塊、行內程式碼、粗體
+function md(src) {
+  const lines = String(src || '').split(/\r?\n/);
+  let html = '', i = 0;
+  const inline = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^```/.test(l)) {
+      const buf = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      html += `<pre><code>${esc(buf.join('\n'))}</code></pre>`;
+    } else if (/^\s*\|.*\|\s*$/.test(l)) {
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(lines[i++]);
+      const cells = r => r.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map(c => c.trim());
+      const body = rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r));
+      html += '<div class="tablewrap"><table>' + body.map((r, k) => `<tr>${cells(r).map(c => (k === 0 ? `<th>${inline(c)}</th>` : `<td>${inline(c)}</td>`)).join('')}</tr>`).join('') + '</table></div>';
+    } else if (/^#{1,4}\s/.test(l)) {
+      const n = l.match(/^#+/)[0].length;
+      html += `<h${n}>${inline(l.replace(/^#+\s*/, ''))}</h${n}>`;
+      i++;
+    } else if (/^\s*[-*]\s+/.test(l)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*[-*]\s+/, ''));
+      html += `<ul>${items.map(x => `<li>${inline(x)}</li>`).join('')}</ul>`;
+    } else if (!l.trim()) {
+      i++;
+    } else {
+      const buf = [];
+      while (i < lines.length && lines[i].trim() && !/^(```|#{1,4}\s|\s*[-*]\s+|\s*\|)/.test(lines[i])) buf.push(lines[i++]);
+      html += `<p>${buf.map(inline).join('<br>')}</p>`;
+    }
+  }
+  return `<div class="md">${html}</div>`;
+}
+
+function tokenKpis(t) {
+  if (!t) return '<div class="kpis tok"><div class="k muted">token：找不到這個任務的 Codex 對話紀錄（任務尚未開始或不是本機 Codex 執行）</div></div>';
+  const pctOfCtx = t.ctxWindow ? Math.round((t.ctx / t.ctxWindow) * 100) : null;
+  const q = (name, p) => {
+    const dlt = quotaDelta(p);
+    if (dlt == null) return '';
+    return `<div class="kpi" title="${esc(`${name}額度已用 ${p[0]}% → ${p[1]}%；同時段其他 Codex 對話的用量也會算進來`)}"><div class="v" style="color:${dlt >= 10 ? 'var(--warn)' : 'inherit'}">+${dlt}%</div><div class="k">${name}額度（${p[0]}→${p[1]}%）</div></div>`;
+  };
+  return `<div class="kpis tok">
+    <div class="kpi" title="每一步都會重送整段對話，所以輸入遠大於輸出；多數是快取"><div class="v">${fmtTok(t.input)}</div><div class="k">輸入 token（含快取）</div></div>
+    <div class="kpi" title="這次新送出、沒命中快取的部分"><div class="v">${fmtTok(t.uncached)}</div><div class="k">未快取</div></div>
+    <div class="kpi" title="${esc(`含推理 ${t.reasoning.toLocaleString()}`)}"><div class="v">${fmtTok(t.output)}</div><div class="k">輸出 token</div></div>
+    <div class="kpi" title="最後一步送出的對話長度 / 模型上限；越長，之後每一步越貴"><div class="v">${fmtTok(t.ctx)}${pctOfCtx != null ? `<small class="muted" style="font-size:12px"> ${pctOfCtx}%</small>` : ''}</div><div class="k">對話長度</div></div>
+    ${q('5 小時', t.primary)}${q('每週', t.weekly)}
+    ${t.resumed ? '<div class="k muted" style="grid-column:1/-1">接續既有對話（--resume）：只計這次任務的回合，但對話長度包含先前內容。</div>' : ''}
+  </div>`;
+}
+
+function renderDetail() {
+  const d = detailData;
+  const el = $('#detail');
+  if (!d) {
+    el.innerHTML = '<div class="empty">從左側選一個任務</div>';
+    return;
+  }
+  const prevScroll = el.querySelector('.pane')?.parentElement === el ? el.scrollTop : el.scrollTop;
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  const c = d.counts;
+  const events = d.events.filter(e => showCmds || !['cmd', 'cmd-ok'].includes(e.kind));
+  let pane = '';
+  if (tab === 'timeline') {
+    pane = `<div class="tl-opts">
+      <label><input type="checkbox" id="optCmds" ${showCmds ? 'checked' : ''}> 顯示指令</label>
+      <label><input type="checkbox" id="optTail" ${followTail ? 'checked' : ''}> 自動捲到最新</label>
+      <span>${d.events.length} 個事件</span></div>
+      <ul class="tl">${events
+        .map(e => `<li class="${esc(e.kind)}"><span class="time">${hms(e.t)}</span><span class="ico">${ICON[e.kind] || '•'}</span><span class="txt">${e.kind === 'msg' ? md(e.text) : esc(e.text) + (e.exit !== undefined && e.kind !== 'cmd-ok' ? ` <span class="muted">(exit ${e.exit})</span>` : '')}</span></li>`)
+        .join('')}</ul>
+      ${isRunning(d) ? '<p class="muted">⏳ 執行中，畫面會自動更新…</p>' : ''}`;
+  } else if (tab === 'final') {
+    pane = d.finalOutput ? md(d.finalOutput) : '<p class="muted">Codex 尚未輸出最終回報。</p>';
+  } else if (tab === 'prompt') {
+    pane = md(d.prompt || '（沒有任務說明）');
+  } else if (tab === 'diff') {
+    pane = `<p><button class="btn" id="runDiff">${d.hasSnapshot ? '比對工作區（以委派前快照為準）' : '沒有快照'}</button></p><pre class="plain" id="diffOut">${esc(d._diff || '尚未比對')}</pre>`;
+  }
+  el.innerHTML = `
+  <div class="d-head">
+    <h2>${esc(short(d))} ${badge(d)} ${d.write ? '' : '<span class="badge ro">唯讀</span>'}</h2>
+    <div class="d-meta">
+      ${d.by ? `<span title="${esc(d.by.cwd)}">委派：<b>${esc(roleName(d))}</b>${d.by.session ? `（${esc(d.by.session)}）` : ''}</span>` : ''}
+      <span>repo：${esc(d.repo)}</span><span>開始：${fmtTime(d.startedAt)}</span>
+      <span>結束：${d.completedAt ? fmtTime(d.completedAt) : '—'}</span>
+      <span class="mono" data-elapsed="${esc(d.id)}">⏱ ${elapsed(d)}</span>
+      <span class="mono">${esc(d.id)}</span>
+    </div>
+    ${stepper(d)}
+    <div class="d-actions">
+      <button class="btn" data-act="open-watch">開 cmd 進度視窗</button>
+      <button class="btn" data-act="open-log">開啟 log</button>
+      <button class="btn" data-act="open-repo">開啟 repo 資料夾</button>
+      <button class="btn" data-copy="${esc(d.id)}">複製 jobId</button>
+    </div>
+  </div>
+  ${d.failReason ? `<div class="alert fail">⛔ ${esc(d.failReason)}</div>` : ''}
+  ${stalled(d) ? `<div class="alert warn">已 ${Math.floor((Date.now() - new Date(d.lastEventAt)) / 60000)} 分鐘沒有新動作（最後：${ago(d.lastEventAt)}），可能在跑長指令或卡住。</div>` : ''}
+  <div class="kpis">
+    <div class="kpi"><div class="v" data-elapsed="${esc(d.id)}">${elapsed(d)}</div><div class="k">經過時間</div></div>
+    <div class="kpi"><div class="v">${c.cmd}</div><div class="k">執行指令</div></div>
+    <div class="kpi"><div class="v" style="color:${c.cmdFail ? 'var(--fail)' : 'inherit'}">${c.cmdFail}</div><div class="k">指令失敗</div></div>
+    <div class="kpi"><div class="v">${c.edits}</div><div class="k">修改檔案次數</div></div>
+    <div class="kpi"><div class="v">${c.msgs}</div><div class="k">Codex 說明</div></div>
+    <div class="kpi"><div class="v" style="font-size:14px">${esc(ago(d.lastEventAt) || '—')}</div><div class="k">最後動作</div></div>
+  </div>
+  ${tokenKpis(d.tokens)}
+  <div class="tabs" role="tablist">
+    ${[['timeline', '時間軸'], ['final', '最終回報'], ['prompt', '任務說明'], ['diff', '工作區比對']]
+      .map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${n}</button>`)
+      .join('')}
+  </div>
+  <div class="pane">${pane}</div>`;
+  if (tab === 'timeline' && followTail && isRunning(d)) el.scrollTop = el.scrollHeight;
+  else if (!atBottom) el.scrollTop = prevScroll;
+}
+
+async function loadDetail() {
+  if (!selected) return;
+  try {
+    const r = await fetch(`/api/jobs/${encodeURIComponent(selected)}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.id !== selected) return;
+    d._diff = detailData && detailData.id === d.id ? detailData._diff : '';
+    const changed = !detailData || JSON.stringify([detailData.events.length, detailData.rawStatus, detailData.phase, detailData.finalOutput.length]) !== JSON.stringify([d.events.length, d.rawStatus, d.phase, d.finalOutput.length]);
+    detailData = d;
+    if (changed) renderDetail();
+  } catch {}
+}
+
+function select(id) {
+  if (!id) return;
+  selected = id;
+  history.replaceState(null, '', '#' + encodeURIComponent(id));
+  detailData = null;
+  tab = 'timeline';
+  renderList();
+  $('#detail').innerHTML = '<div class="empty">載入中…</div>';
+  loadDetail();
+  clearInterval(detailTimer);
+  detailTimer = setInterval(loadDetail, 1500);
+}
+
+// 事件
+document.addEventListener('click', async e => {
+  const card = e.target.closest('.card');
+  if (card) return select(card.dataset.id);
+  const chip = e.target.closest('.chip');
+  if (chip) {
+    filter = chip.dataset.f;
+    document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c === chip));
+    return renderList();
+  }
+  const t = e.target.closest('.tab');
+  if (t) {
+    tab = t.dataset.tab;
+    return renderDetail();
+  }
+  const act = e.target.closest('[data-act]');
+  if (act && selected) {
+    await fetch(`/api/jobs/${encodeURIComponent(selected)}/${act.dataset.act}`, { method: 'POST', headers: { 'X-Codex-Board': '1' } });
+    return;
+  }
+  const cp = e.target.closest('[data-copy]');
+  if (cp) {
+    navigator.clipboard?.writeText(cp.dataset.copy);
+    cp.textContent = '已複製';
+    setTimeout(() => (cp.textContent = '複製 jobId'), 1200);
+    return;
+  }
+  if (e.target.id === 'runDiff' && detailData?.hasSnapshot) {
+    e.target.disabled = true;
+    $('#diffOut').textContent = '比對中…';
+    const r = await fetch(`/api/jobs/${encodeURIComponent(selected)}/diff`).then(r => r.json());
+    detailData._diff = r.text;
+    renderDetail();
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'optCmds') {
+    showCmds = e.target.checked;
+    renderDetail();
+  }
+  if (e.target.id === 'optTail') followTail = e.target.checked;
+});
+$('#q').addEventListener('input', renderList);
+window.addEventListener('hashchange', () => {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (id && id !== selected) select(id);
+});
+
+// 每秒更新計時與「無動作」提示
+setInterval(() => {
+  document.querySelectorAll('[data-elapsed]').forEach(n => {
+    const j = (detailData && detailData.id === n.dataset.elapsed && detailData) || jobs.find(x => x.id === n.dataset.elapsed);
+    if (j && isRunning(j)) n.textContent = (n.classList.contains('v') ? '' : '⏱ ') + elapsed(j);
+  });
+  $('#updated').textContent = lastUpdate ? `更新於 ${hms(lastUpdate)}` : '';
+}, 1000);
+setInterval(renderQuota, 60000); // 過了重置時間時更新顯示
+
+// 伺服器推送
+let lastUpdate = null;
+function connect() {
+  const es = new EventSource('/api/stream');
+  es.onopen = () => $('#conn').classList.add('on');
+  es.onerror = () => $('#conn').classList.remove('on');
+  es.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === 'jobs') {
+      jobs = m.jobs;
+      lastUpdate = new Date();
+      renderStats();
+      renderList();
+      if (!selected && jobs.length) select((jobs.find(isRunning) || jobs[0]).id);
+    } else if (m.type === 'quota') {
+      quota = m.quota;
+      renderQuota();
+    } else if (m.type === 'focus') {
+      select(m.id);
+      window.focus();
+    }
+  };
+}
+connect();
+if (selected) select(selected);
+</script>
+</body>
+</html>
