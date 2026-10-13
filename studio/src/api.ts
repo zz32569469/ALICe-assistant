@@ -3,7 +3,7 @@ export type Thread = "work" | "chat";
 
 // 呼叫 Alice Core 的 HTTP API。token 由 npm run studio 放在網址 # 後面帶進來（W-2），存在瀏覽器後清掉網址。
 
-import type { Channel, ChannelMessage, CodexJobDetail, CodexJobSummary, CodexQuota, Fortune, FortuneKind, FortuneSlot, GameCard, GameConfirmation, Message, PlanView, Plan, QuotaResult, ReportEntry, Task, Meeting, TrackView, UsageSummary } from "./types";
+import type { Channel, ChannelMessage, CodexJobDetail, CodexJobSummary, CodexQuota, Fortune, FortuneKind, FortuneSlot, GameCard, GameConfirmation, Message, PlanView, Plan, QuotaResult, ReportEntry, Task, Meeting, TrackView, UsageSummary, Forecast, WeatherLocation, GarbageEntry, GarbageView, StopSearch } from "./types";
 
 const TOKEN_KEY = "alice.studio.token";
 const CORE_KEY = "alice.studio.core";
@@ -161,6 +161,16 @@ export const api = {
   gameConfirmationAction: (id: string, action: "approve" | "reject") => post(`/api/games/confirmations/${encodeURIComponent(id)}/${action}`),
   fortune: () => request<{ slots: Record<FortuneKind, FortuneSlot> }>("/api/fortune"),
   drawFortune: (kind: FortuneKind) => post<{ fortune: Fortune; slots: Record<FortuneKind, FortuneSlot> }>(`/api/fortune/${kind}`),
+  /** §95 天氣。 */
+  weather: (refresh = false) => request<{ location: WeatherLocation | null; forecast: Forecast | null }>(`/api/weather${refresh ? "?refresh=1" : ""}`),
+  searchWeather: (query: string) => request<{ results: WeatherLocation[] }>(`/api/weather/search?q=${encodeURIComponent(query)}`),
+  setWeatherLocation: (location: WeatherLocation) => post<{ location: WeatherLocation; forecast: Forecast | null }>("/api/weather/location", location),
+  /** §97 垃圾車、回收車。 */
+  garbage: () => request<GarbageView>("/api/garbage"),
+  saveGarbage: (entries: GarbageEntry[]) => post<GarbageView>("/api/garbage", { entries }),
+  /** §98 依地址查附近的清運點。 */
+  garbageStops: (query: string) => request<StopSearch>(`/api/garbage/stops?q=${encodeURIComponent(query)}`),
+  skipGarbage: (id: string, skip: boolean) => post<GarbageView>(`/api/garbage/${encodeURIComponent(id)}/${skip ? "skip" : "unskip"}`),
   meetings: () => request<{ meetings: Meeting[] }>("/api/meetings"),
   addMeeting: (text: string) => post<{ meeting: Meeting }>("/api/meetings", { text }),
   removeMeeting: (id: string) => request<{ ok: true }>(`/api/meetings/${encodeURIComponent(id)}`, { method: "DELETE" }),

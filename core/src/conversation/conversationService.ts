@@ -128,6 +128,8 @@ export class ConversationService {
   readonly #outbox: OutboxService | undefined;
   readonly #games: GameService | undefined;
   readonly #memory: MemoryKeeper | undefined;
+  readonly #weatherLine: (() => string | undefined) | undefined;
+  readonly #garbageLine: (() => string | undefined) | undefined;
   readonly #proxy: ProxyMode | undefined;
   readonly #local: LocalConfig | undefined;
   readonly #summary: KnowledgeSummaryLoader | undefined;
@@ -151,6 +153,10 @@ export class ConversationService {
     games?: GameService;
     /** §85 長期記憶。 */
     memory?: MemoryKeeper;
+    /** §96 聊天提示裡的天氣（一行，只用快取）。 */
+    weatherLine?: () => string | undefined;
+    /** §97 聊天提示裡的垃圾車時間（一行）。 */
+    garbageLine?: () => string | undefined;
     local?: LocalConfig;
     /** §64 代理人模式。 */
     proxy?: ProxyMode;
@@ -168,6 +174,8 @@ export class ConversationService {
     this.#outbox = options.outbox;
     this.#games = options.games;
     this.#memory = options.memory;
+    this.#weatherLine = options.weatherLine;
+    this.#garbageLine = options.garbageLine;
     this.#proxy = options.proxy;
     this.#local = options.local;
     this.#summary = options.local === undefined ? undefined : new KnowledgeSummaryLoader(options.local);
@@ -349,6 +357,8 @@ export class ConversationService {
         state: this.#state.getState(),
         justWoken: this.#state.isJustWoken(),
         now: new Date(),
+        weatherLine: this.#weatherLine?.(),
+        garbageLine: this.#garbageLine?.(),
       }) : buildPrompt({
         personaText: loadPersona(this.#config.personaPath),
         factsText: loadFacts(this.#config.factsPath),
@@ -452,9 +462,9 @@ export class ConversationService {
     this.postNotice(this.#games.applyMeetingBlock(blockText, ALICE_BLOCK_MARKERS.meeting));
   }
 
-  /** 在對話裡留一則系統訊息（§74 會議提醒也用這個）。 */
-  postNotice(text: string): void {
-    const message = this.#store.append({ role: "system", text });
+  /** 在對話裡留一則系統訊息（§74 會議提醒也用這個）；§97 thread 給 chat 時留在聊天分頁。 */
+  postNotice(text: string, thread?: "chat"): void {
+    const message = this.#store.append({ role: "system", text, ...(thread === undefined ? {} : { thread }) });
     this.#events.broadcast("message.created", message);
   }
 

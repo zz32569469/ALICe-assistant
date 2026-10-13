@@ -489,11 +489,40 @@ export const CHAT_SECTION = [
   "- 除了 ALICE_MEMORY（見「長期記憶」），不要放其他 <<<ALICE_ 開頭的區塊（這裡不會處理），不要整理專案進度、不要傳訊給同事 session。主人在這裡問工作的事，簡短回應並請主人到「工作」分頁說。",
 ].join("\n");
 
-export type BuildChatPromptInput = Pick<BuildPromptInput, "personaText" | "factsText" | "history" | "userText" | "state" | "justWoken" | "now" | "uploadsDir" | "currentImages">;
+export type BuildChatPromptInput = Pick<BuildPromptInput, "personaText" | "factsText" | "history" | "userText" | "state" | "justWoken" | "now" | "uploadsDir" | "currentImages"> & {
+  /** §96 主人設定地點的天氣（一行）；沒有就不放。 */
+  weatherLine?: string;
+  /** §97 垃圾車、回收車時間（一行）；沒設定就不放。 */
+  garbageLine?: string;
+};
+
+/** §97：聊天提示裡的垃圾車段落。 */
+export function formatGarbage(line: string | undefined): string | null {
+  if (line === undefined) return null;
+  return [
+    "# 垃圾車、回收車（主人在垃圾車分頁設定）",
+    "",
+    line,
+    "- Core 會在收運前自動跳通知提醒主人，你不用另外提醒；主人問到（例如今天有沒有收、幾點）時照這裡回答。要改時間或略過請主人到右邊的垃圾車分頁。",
+  ].join("\n");
+}
+
+/** §96：聊天提示裡的天氣段落。 */
+export function formatWeather(line: string | undefined): string | null {
+  if (line === undefined) return null;
+  return [
+    "# 天氣（主人在天氣分頁設定的地點）",
+    "",
+    line,
+    "- 主人問天氣、穿搭、要不要帶傘、出門或活動適不適合時參考這裡；沒問就不用主動報天氣，頂多自然帶一句（例如要下雨了）。",
+    "- 這是預報，不保證準確；問到其他地點就用網頁搜尋查。",
+  ].join("\n");
+}
 
 export function buildChatPrompt(input: BuildChatPromptInput): BuiltPrompt {
   const persona = input.factsText === null ? input.personaText : `${input.personaText}\n\n# 關於主人（事實檔）\n\n${input.factsText}`;
-  const systemPrompt = [persona, CHAT_SECTION, MEMORY_SECTION, `# 目前狀態\n\n${formatStateLine(input.state, input.justWoken, input.now)}`].join("\n\n");
+  const life = [formatWeather(input.weatherLine), formatGarbage(input.garbageLine)].filter((section): section is string => section !== null);
+  const systemPrompt = [persona, CHAT_SECTION, MEMORY_SECTION, ...life, `# 目前狀態\n\n${formatStateLine(input.state, input.justWoken, input.now)}`].join("\n\n");
   const history = [...input.history].sort((left, right) => left.seq - right.seq).map((message) => formatMessage(message, input.uploadsDir));
   const historySection = history.length === 0 ? "" : `以下是聊天分頁最近的對話（舊到新）：\n${history.join("\n")}\n\n`;
   return { systemPrompt, transcript: `${historySection}主人的新訊息：\n${input.userText}${imageNote(input.currentImages, input.uploadsDir, true)}` };

@@ -219,3 +219,29 @@ export type CodexQuota = {
   primary?: { used_percent: number; window_minutes?: number; resets_at?: number };
   secondary?: { used_percent: number; window_minutes?: number; resets_at?: number };
 };
+
+/** §95 天氣（Core 從 Open-Meteo 取得）。 */
+export type WeatherLocation = { name: string; latitude: number; longitude: number; admin1?: string; country?: string; timezone?: string };
+export type WeatherDay = { date: string; code: number; label: string; icon: string; max: number; min: number; rainChance: number | null; uvMax: number | null; sunrise: string | null; sunset: string | null };
+export type WeatherHour = { time: string; temperature: number; code: number; icon: string; rainChance: number | null };
+export type Forecast = {
+  fetchedAt: string;
+  current: { time: string; temperature: number; feelsLike: number; humidity: number; windSpeed: number; code: number; label: string; icon: string; isDay: boolean };
+  hours: WeatherHour[];
+  days: WeatherDay[];
+  advice: string[];
+};
+
+/** §97 垃圾車、回收車。 */
+export type GarbageKind = "garbage" | "recycle" | "other";
+export type GarbageEntry = { id: string; label: string; kind: GarbageKind; weekdays: number[]; time: string; before: number[]; place: string; enabled: boolean };
+export type GarbageView = {
+  entries: GarbageEntry[];
+  today: Array<{ id: string; skipped: boolean; passed: boolean }>;
+  week: Array<{ date: string; items: Array<{ id: string; label: string; time: string; kind: GarbageKind; skipped: boolean }> }>;
+};
+
+/** §98 清運點查詢（新北市開放資料）。 */
+export type StopSchedule = { time: string; line: string; memo: string; garbage: number[]; recycle: number[]; food: number[] };
+export type StopResult = { name: string; district: string; village: string; lat: number; lon: number; distance: number | null; matched: boolean; schedules: StopSchedule[] };
+export type StopSearch = { city: string; updatedAt: string; district: string | null; street: string | null; lane: number | null; results: StopResult[] };

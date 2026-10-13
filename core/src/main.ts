@@ -16,6 +16,9 @@ import { MeetingStore } from "./games/meetings.js";
 import { GameConfirmationStore } from "./games/gameConfirmations.js";
 import { showDesktopToast } from "./notify/desktopToast.js";
 import { FortuneService } from "./fortune/fortuneService.js";
+import { WeatherService } from "./weather/weatherService.js";
+import { GarbageService } from "./life/garbageService.js";
+import { GarbageStops } from "./life/garbageStops.js";
 import { uploadsDir } from "./uploads/uploadStore.js";
 import { MemoryKeeper } from "./memory/memoryKeeper.js";
 import { claudeInterpreter } from "./fortune/fortuneService.js";
@@ -180,7 +183,14 @@ async function main(): Promise<void> {
     dbPath: databasePath, factsPath: config.factsPath, backupDir: resolve(config.dataDir, "memory-backups"), messages: store,
     interpret: claudeInterpreter(config.claudePath, resolve(config.dataDir, "claude-code", "memory")),
   });
-  const conversation = new ConversationService({ config, store, state, provider, events, tasks, channels, plans, outbox, games, local, proxy, memory, usage: usageStore, errors });
+  // §95：天氣（Open-Meteo，免費不用金鑰）；地點存在 data/weather.json。§96 聊天提示帶一行天氣（只用快取）。
+  const weather = new WeatherService({ file: resolve(config.dataDir, "weather.json") });
+  void weather.forecast().catch(() => undefined);
+  // §97：垃圾車、回收車提醒（data/garbage.json）。
+  const garbage = new GarbageService({ file: resolve(config.dataDir, "garbage.json") });
+  // §98：新北市垃圾車清運點（公開資料下載到 data/garbage-ntpc.json，地址只在本機比對）。
+  const garbageStops = new GarbageStops({ file: resolve(config.dataDir, "garbage-ntpc.json") });
+  const conversation = new ConversationService({ config, store, state, provider, events, tasks, channels, plans, outbox, games, local, proxy, memory, weatherLine: () => weather.promptLine(), garbageLine: () => garbage.promptLine(), usage: usageStore, errors });
   channels.setFollowupHandler((followup) => conversation.enqueueChannelFollowup(followup));
   tasks.setCompletionHandler((message, task) => conversation.enqueueTaskCompletion(message, task));
   plans.setNotificationHandler((message, kind, plan, items, files) => conversation.enqueuePlanNotification(message, kind, plan, items, files));
@@ -195,7 +205,7 @@ async function main(): Promise<void> {
     dbPath: databasePath, events, personaPath: config.personaPath, claudePath: config.claudePath,
     workDir: resolve(config.dataDir, "claude-code", "fortune"),
   });
-  const server = new AliceHttpServer({ config, token, store, state, conversation, events, tasks, channels, plans, outbox, games, notifications, translate, proxy, codexBoard, fortune, memory, usage: usageStore, quotas, setupWarnings });
+  const server = new AliceHttpServer({ config, token, store, state, conversation, events, tasks, channels, plans, outbox, games, notifications, translate, proxy, codexBoard, fortune, weather, garbage, garbageStops, memory, usage: usageStore, quotas, setupWarnings });
   const unsubscribe = state.subscribe((nextState) => events.broadcast("state.changed", nextState));
   // §46：每天早上 9 點後第一次檢查時，請艾莉絲核對各專案的任務清單。
   const dailyReview = (): void => { if (games.reviewDue()) conversation.enqueueDailyReview(); };
@@ -208,15 +218,24 @@ async function main(): Promise<void> {
         .then((error) => { if (error !== null) console.warn(`桌面通知失敗：${error}`); });
     }
   };
+  // §97：垃圾車、回收車：聊天分頁留訊息＋桌面通知。
+  const garbageReminders = (): void => {
+    for (const reminder of garbage.dueReminders()) {
+      conversation.postNotice(reminder.text, "chat");
+      void showDesktopToast(reminder.title, reminder.body).then((error) => { if (error !== null) console.warn(`桌面通知失敗：${error}`); });
+    }
+  };
   const tickTimer = setInterval(() => {
     state.tick();
     notifications.tick();
     meetingReminders();
+    garbageReminders();
     void memory.tick().then((text) => { if (text !== undefined) conversation.postNotice(text); });
     void codexBoard.refreshCache().finally(dailyReview);
   }, 60_000);
   notifications.tick();
   meetingReminders();
+  garbageReminders();
   void codexBoard.refreshCache().finally(dailyReview);
   let shuttingDown = false;
 

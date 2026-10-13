@@ -30,3 +30,6 @@ import "./fortune.test.js";
 import "./chatThread.test.js";
 import "./uploads.test.js";
 import "./memory.test.js";
+import "./weather.test.js";
+import "./garbage.test.js";
+import "./garbageStops.test.js";

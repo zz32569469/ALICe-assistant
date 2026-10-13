@@ -8,17 +8,25 @@ import ChatPanel from "./components/ChatPanel.vue";
 import CodexTab from "./components/CodexTab.vue";
 import MeetingsTab from "./components/MeetingsTab.vue";
 import FortuneTab from "./components/FortuneTab.vue";
+import WeatherTab from "./components/WeatherTab.vue";
+import MorningCard from "./components/MorningCard.vue";
+import GarbageTab from "./components/GarbageTab.vue";
 import GamesTab from "./components/GamesTab.vue";
 import ThemePicker from "./components/ThemePicker.vue";
 import UsageTab from "./components/UsageTab.vue";
 
 // §51：拿掉「計畫」分頁（專案改由艾莉絲追蹤任務；Core 的計畫功能保留，核准卡片仍在聊天區）。
-// §92：右方功能列表依左側分頁分開：工作看專案、會議、Codex、用量；聊天看占卜。
+// §92：右方功能列表依左側分頁分開：工作看專案、會議、Codex、用量；聊天看占卜、天氣（§95）。
 type WorkTab = "games" | "meetings" | "codex" | "usage";
-type ChatTab = "fortune";
+type ChatTab = "fortune" | "weather" | "garbage";
 
 const workTab = ref<WorkTab>("games");
 const chatTab = ref<ChatTab>("fortune");
+/** §96 早安小卡的連結：切到聊天側的天氣或占卜（窄視窗時切到右邊）。 */
+function openChatTab(tab: ChatTab): void {
+  chatTab.value = tab;
+  narrowView.value = "work";
+}
 
 // §78：左側「工作／聊天」分頁，各自一份紀錄；切過去就清掉那邊的新回覆標記。
 function selectThread(thread: "work" | "chat"): void {
@@ -263,6 +271,7 @@ onMounted(() => connect());
             {{ key === "work" ? "工作" : "聊天" }}<span v-if="store.unread[key]" class="unread-dot" title="有新回覆" />
           </button>
         </nav>
+        <MorningCard v-if="store.thread === 'chat'" @open="openChatTab" />
         <ChatPanel :key="store.thread" :thread="store.thread" />
       </section>
       <div
@@ -274,6 +283,8 @@ onMounted(() => connect());
         <div class="tabbar">
         <nav v-if="store.thread === 'chat'" class="tabs" role="tablist">
           <button role="tab" :aria-selected="chatTab === 'fortune'" :class="{ active: chatTab === 'fortune' }" @click="chatTab = 'fortune'">占卜</button>
+          <button role="tab" :aria-selected="chatTab === 'weather'" :class="{ active: chatTab === 'weather' }" @click="chatTab = 'weather'">天氣</button>
+          <button role="tab" :aria-selected="chatTab === 'garbage'" :class="{ active: chatTab === 'garbage' }" @click="chatTab = 'garbage'">垃圾車</button>
         </nav>
         <nav v-else class="tabs" role="tablist" style="padding-right: 150px">
           <button role="tab" :aria-selected="workTab === 'games'" :class="{ active: workTab === 'games' }" @click="workTab = 'games'">專案</button>
@@ -290,7 +301,9 @@ onMounted(() => connect());
         </span>
         </div>
         <div class="tab-body">
-          <FortuneTab v-if="store.thread === 'chat'" />
+          <FortuneTab v-if="store.thread === 'chat' && chatTab === 'fortune'" />
+          <WeatherTab v-else-if="store.thread === 'chat' && chatTab === 'weather'" />
+          <GarbageTab v-else-if="store.thread === 'chat'" />
           <GamesTab v-else-if="workTab === 'games'" />
           <MeetingsTab v-else-if="workTab === 'meetings'" />
           <CodexTab v-else-if="workTab === 'codex'" />

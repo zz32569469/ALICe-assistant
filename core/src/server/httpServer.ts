@@ -11,6 +11,9 @@ import type { ConversationService } from "../conversation/conversationService.js
 import type { ProxyMode } from "../conversation/proxyMode.js";
 import type { CodexBoard } from "../codex/codexBoard.js";
 import { FortuneError, type FortuneService } from "../fortune/fortuneService.js";
+import { WeatherError, type WeatherService } from "../weather/weatherService.js";
+import { GarbageError, type GarbageService } from "../life/garbageService.js";
+import { GarbageStopsError, type GarbageStops } from "../life/garbageStops.js";
 import type { MemoryKeeper } from "../memory/memoryKeeper.js";
 import { EventHub } from "../protocol/eventHub.js";
 import type { MessageStore } from "../store/messageStore.js";
@@ -137,6 +140,9 @@ export class AliceHttpServer {
   readonly #proxy: ProxyMode | undefined;
   readonly #codexBoard: CodexBoard | undefined;
   readonly #fortune: FortuneService | undefined;
+  readonly #weather: WeatherService | undefined;
+  readonly #garbage: GarbageService | undefined;
+  readonly #garbageStops: GarbageStops | undefined;
   readonly #memory: MemoryKeeper | undefined;
   readonly #notifications: NotificationService | undefined;
   readonly #translate: TranslateService | undefined;
@@ -170,6 +176,9 @@ export class AliceHttpServer {
     /** §65 Codex 任務看板。 */
     codexBoard?: CodexBoard;
     fortune?: FortuneService;
+    weather?: WeatherService;
+    garbage?: GarbageService;
+    garbageStops?: GarbageStops;
     memory?: MemoryKeeper;
     /** 啟動時發現的設定問題（本機設定、Codex 等），Web Studio 頂端顯示（§29）。 */
     setupWarnings?: string[];
@@ -190,6 +199,9 @@ export class AliceHttpServer {
     this.#proxy = options.proxy;
     this.#codexBoard = options.codexBoard;
     this.#fortune = options.fortune;
+    this.#weather = options.weather;
+    this.#garbage = options.garbage;
+    this.#garbageStops = options.garbageStops;
     this.#memory = options.memory;
     this.#notifications = options.notifications;
     this.#translate = options.translate;
@@ -379,6 +391,92 @@ export class AliceHttpServer {
         sendError(response, error.code === "conflict" ? 409 : error.code === "busy" ? 409 : 503, error.code === "failed" ? "unavailable" : "conflict", error.message);
       }
       return;
+    }
+    // §95 天氣：目前地點的預報（?refresh=1 重抓）、搜尋城市、設定地點。
+    if (url.pathname.startsWith("/api/weather") && this.#weather !== undefined) {
+      try {
+        if (request.method === "GET" && url.pathname === "/api/weather") {
+          sendJson(response, 200, { location: this.#weather.location(), forecast: await this.#weather.forecast(url.searchParams.get("refresh") === "1") });
+          return;
+        }
+        if (request.method === "GET" && url.pathname === "/api/weather/search") {
+          sendJson(response, 200, { results: await this.#weather.search(url.searchParams.get("q") ?? "") });
+          return;
+        }
+        if (request.method === "POST" && url.pathname === "/api/weather/location") {
+          let body: unknown;
+          try {
+            body = await readJsonBody(request);
+          } catch {
+            sendError(response, 400, "bad_request", "JSON 內容無效或超過 64 KB");
+            return;
+          }
+          const location = this.#weather.setLocation(body);
+          sendJson(response, 200, { location, forecast: await this.#weather.forecast(true) });
+          return;
+        }
+      } catch (error) {
+        if (!(error instanceof WeatherError)) throw error;
+        if (error.kind === "invalid") sendError(response, 400, "bad_request", error.message);
+        else sendError(response, 503, "unavailable", error.message);
+        return;
+      }
+    }
+    // §97 垃圾車、回收車：設定（整份覆寫）、今天略過。
+    if (url.pathname.startsWith("/api/garbage") && this.#garbage !== undefined) {
+      const garbage = this.#garbage;
+      const view = () => {
+        const now = new Date();
+        const week = Array.from({ length: 7 }, (_, offset) => {
+          const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+          return { date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`, items: garbage.on(date).map(({ entry, skipped }) => ({ id: entry.id, label: entry.label, time: entry.time, kind: entry.kind, skipped })) };
+        });
+        return { entries: garbage.entries(), today: garbage.today().map(({ entry, skipped, passed }) => ({ id: entry.id, skipped, passed })), week };
+      };
+      // §98：依地址查附近的清運點（新北市開放資料，在本機比對）。
+      if (request.method === "GET" && url.pathname === "/api/garbage/stops" && this.#garbageStops !== undefined) {
+        try {
+          sendJson(response, 200, await this.#garbageStops.search(url.searchParams.get("q") ?? ""));
+        } catch (error) {
+          if (!(error instanceof GarbageStopsError)) throw error;
+          if (error.kind === "invalid") sendError(response, 400, "bad_request", error.message);
+          else sendError(response, 503, "unavailable", error.message);
+        }
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/garbage") {
+        sendJson(response, 200, view());
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/api/garbage") {
+        let body: unknown;
+        try {
+          body = await readJsonBody(request);
+        } catch {
+          sendError(response, 400, "bad_request", "JSON 內容無效或超過 64 KB");
+          return;
+        }
+        try {
+          garbage.save((body as { entries?: unknown } | null)?.entries);
+        } catch (error) {
+          if (!(error instanceof GarbageError)) throw error;
+          sendError(response, 400, "bad_request", error.message);
+          return;
+        }
+        this.#events.broadcast("garbage.updated", view());
+        sendJson(response, 200, view());
+        return;
+      }
+      const skipMatch = /^\/api\/garbage\/([\w-]{1,64})\/(skip|unskip)$/u.exec(url.pathname);
+      if (request.method === "POST" && skipMatch !== null) {
+        if (!garbage.setSkip(skipMatch[1]!, skipMatch[2] === "skip")) {
+          sendError(response, 404, "not_found", "找不到這筆設定");
+          return;
+        }
+        this.#events.broadcast("garbage.updated", view());
+        sendJson(response, 200, view());
+        return;
+      }
     }
     // §73 重要會議：Studio 會議分頁登記、刪除。
     if (url.pathname === "/api/meetings" && this.#games !== undefined) {

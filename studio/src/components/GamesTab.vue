@@ -171,13 +171,13 @@ const sorted = computed(() => [...store.games].sort((left, right) => {
           <span class="version" :class="{ done: finished(game) }">v{{ game.version }}{{ finished(game) ? " 完成" : "" }}</span>
           <span v-if="game.brand" class="code">{{ game.brand }}</span>
           <span v-if="game.code" class="code branch">{{ game.code }}</span>
-          <span v-if="frozen(game)" class="frozen-badge">❄ 凍結中</span>
         </div>
         <div class="deadline" :class="deadline(game).level">
           <span class="main num">{{ deadline(game).main }}</span>
           <span class="sub num">{{ deadline(game).sub }}</span>
         </div>
       </header>
+      <div v-if="frozen(game)" class="frozen-clip" aria-hidden="true"><div class="frozen-tape"><span class="side" /><span class="main" /><span class="side" /></div></div>
       <p v-if="isCollapsed(game)" class="collapsed-summary small muted" @click="toggle(game)">{{ summary(game) }}</p>
 
       <template v-if="!isCollapsed(game)">
@@ -254,10 +254,36 @@ const sorted = computed(() => [...store.games].sort((left, right) => {
 .games { height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 14px; overflow-y: auto; }
 .empty { margin: 32px 12px; text-align: center; }
 .empty p { margin: 4px 0; }
-.card { border: var(--bw) solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px 12px; background: var(--panel); box-shadow: var(--card-shadow); }
+.card { flex-shrink: 0; border: var(--bw) solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px 12px; background: var(--panel); box-shadow: var(--card-shadow); }
 .card.ended { opacity: 0.6; }
-.card.frozen { border-style: dashed; background: color-mix(in srgb, var(--panel) 88%, #7fb4e6); }
-.frozen-badge { font-size: 0.78em; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--panel) 60%, #7fb4e6); color: var(--text); white-space: nowrap; }
+/* §93 凍結：封條斜貼過卡片，標題列以外的內容變淡；收合時封條貼在底部。顏色與字依主題，在 src/frozen-themes.css。 */
+/* 封條超出卡片的部分由 frozen-clip 裁掉；卡片本身不裁，主題貼在框外的標籤（例如終端機的 PROJECT）才看得到。 */
+.card.frozen { position: relative; }
+.frozen-clip { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+/* 只留專案名稱清楚，其他（版本、代號、截止日、內容）都模糊 */
+.card.frozen > :not(header):not(.card-actions):not(.frozen-clip),
+.card.frozen header .title > :not(h3),
+.card.frozen header .deadline { opacity: 0.6; filter: grayscale(0.5) blur(1.8px); user-select: none; }
+.card.frozen.collapsed { padding-bottom: 60px; }
+.frozen-tape {
+  position: absolute;
+  top: 46%;
+  left: -10%;
+  right: -10%;
+  height: 46px;
+  transform: rotate(-8deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 0.25em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.card.frozen.collapsed .frozen-tape { top: auto !important; bottom: 8px; height: 40px !important; font-size: 1rem; transform: rotate(-1.5deg) !important; }
+.card-actions { position: relative; z-index: 1; }
 .frozen-note { margin: 8px 0 4px; }
 .card-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .deadline.is-frozen .main { color: var(--muted); }

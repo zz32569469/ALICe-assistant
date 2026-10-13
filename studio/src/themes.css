@@ -452,6 +452,7 @@
   position: absolute; top: -9px; left: 12px; padding: 0 6px; background: #030703; font-size: 11px; line-height: 14px; color: var(--cyan);
 }
 :root[data-theme="terminal"] .card::before { content: "┤ PROJECT ├"; }
+:root[data-theme="terminal"] .card.tarot::before { content: "┤ TAROT ├"; left: 50%; transform: translateX(-50%); white-space: nowrap; }
 :root[data-theme="terminal"] .confirm::before { content: "┤ AWAITING APPROVAL ├"; color: #ffbf3f; }
 :root[data-theme="terminal"] .pick-detail::before { content: "┤ DETAIL ├"; }
 :root[data-theme="terminal"] .confirm { border-color: #8a6a1f; border-left: 3px double #ffbf3f; }
@@ -547,6 +548,8 @@
   background: var(--season-icon) center / contain no-repeat;
 }
 :root:is([data-theme="spring"], [data-theme="summer"], [data-theme="autumn"], [data-theme="winter"]) .card { position: relative; }
+/* 塔羅牌太小，不放季節角標（會蓋到正逆位） */
+:root:is([data-theme="spring"], [data-theme="summer"], [data-theme="autumn"], [data-theme="winter"]) .card.tarot::after { display: none; }
 :root:is([data-theme="spring"], [data-theme="summer"], [data-theme="autumn"], [data-theme="winter"]) .card::after {
   content: ""; position: absolute; right: 14px; bottom: 12px; width: 22px; height: 22px; opacity: 0.55;
   background: var(--season-icon) center / contain no-repeat; pointer-events: none;
