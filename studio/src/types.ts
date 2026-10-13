@@ -156,6 +156,9 @@ export type GameCard = {
   repos: string[];
   sessions: string[];
   note: string;
+  /** §93：凍結的時間（null＝沒凍結）與原因。 */
+  frozenAt?: string | null;
+  frozenReason?: string;
   stages: Array<{ track: string; stage: string; at: string }>;
   /** §46 任務清單。 */
   tasks: Array<{ number: number; title: string; track: string; status: string; source: string; version: string; note: string; updatedAt: string }>;

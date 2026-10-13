@@ -301,6 +301,7 @@ export function formatGames(
     `- update 時只寫要改的欄位，例如 {"action":"update","name":"專案名稱","stages":${stagesExample}}（stages 只寫要換的那條線即可）；改名用 newName；deadline 寫 null 表示取消截止日；開新版本寫 {"action":"update","name":"專案名稱","version":"<新版號>","versionReason":"需求來源…","stages":${firstExample}}。`,
     repoRule,
     "- 改截止日、開新版本要主人說了才改。",
+    "- 凍結（暫停）專案：主人說要凍結或暫停時寫 {\"action\":\"update\",\"name\":\"專案名稱\",\"frozen\":true,\"frozenReason\":\"原因（選填）\"}，恢復寫 \"frozen\":false（Core 會把截止日延後凍結的天數，不用自己改 deadline）。凍結的專案不核對進度、不催進度、不提醒截止日；主人或同事主動提到時照常回答與記錄任務。不要自己決定凍結。",
     `- 換階段與任務完成（做完 → 主人確認 → 更新）：從同事回報或進度資料判斷某條線該換階段、某個任務做完了，就直接寫進 ALICE_GAME（stages、任務 status 完成），並加 reason 寫依據與完成條件達到多少（例 {"action":"update","name":"專案名稱","stages":${stagesExample},"reason":"同事回報測試通過"}）。Core 不會直接改，會給主人一張確認卡片並跳桌面通知，主人確認後才更新；你的回覆只要一句「已送出確認：…」，不用再用文字問。主人沒確認的不要重送，除非有新的回報。`,
     "",
     "任務清單（每個專案各自編號 T1、T2…）：在 ALICE_GAME 區塊加 tasks（可以只有 tasks，不改卡片其他欄位）：",

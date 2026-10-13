@@ -153,6 +153,44 @@ test("applyGameBlock creates and updates cards with stage history", () => {
   }
 });
 
+// §93：凍結的專案不算進行中（不核對、不列任務），解凍後恢復；凍結時間保留第一次的。
+test("frozen games are skipped by progress review and shown as one line", () => {
+  useWorkflow(TEST_WORKFLOW);
+  const directory = tempDir();
+  const store = new GameStore(join(directory, "alice.db"));
+  try {
+    applyGameBlock(store, gameBlock({ action: "create", name: "甲", deadline: "2026-10-20", tasks: [{ op: "add", title: "做匯出" }] }), [], new Date("2026-10-01T01:00:00Z"));
+    applyGameBlock(store, gameBlock({ action: "create", name: "乙" }), [], new Date("2026-10-01T01:00:00Z"));
+    assert.throws(() => parseGameBlock(gameBlock({ action: "update", name: "甲", frozen: "yes" })), /frozen/u);
+    const frozen = applyGameBlock(store, gameBlock({ action: "update", name: "甲", frozen: true, frozenReason: "等客戶回覆" }), [], new Date("2026-10-05T01:00:00Z"));
+    assert.match(frozen, /凍結（等客戶回覆）/u);
+    assert.equal(store.find("甲")!.frozenAt, "2026-10-05T01:00:00.000Z");
+    applyGameBlock(store, gameBlock({ action: "update", name: "甲", frozen: true, frozenReason: "改等下季" }), [], new Date("2026-10-06T01:00:00Z"));
+    assert.equal(store.find("甲")!.frozenAt, "2026-10-05T01:00:00.000Z");
+    assert.equal(store.find("甲")!.frozenReason, "改等下季");
+
+    const service = new GameService({ store, projects: () => [], now: () => new Date("2026-10-07T03:00:00Z") });
+    assert.deepEqual(service.progress([]).games, ["乙"]);
+    assert.deepEqual(service.progress(["甲"]).games, ["甲"]);
+    const line = service.promptLines()[0]!;
+    assert.match(line, /^- 甲：凍結中（2026-10-05 起，改等下季）/u);
+    assert.doesNotMatch(line, /做匯出/u);
+
+    assert.equal(digestText({ games: [{ game: store.find("甲")!, lastActivityAt: null }], waitingDecisions: 0, now: new Date("2026-10-19T03:00:00Z") }), undefined);
+
+    // 10/5 凍結、10/7 解凍：凍結 2 天，截止日 10/20 → 10/22。
+    assert.match(service.setFrozen(store.find("甲")!.id, false)!, /解除凍結（凍結 2 天，截止日 2026-10-20 → 2026-10-22）/u);
+    assert.equal(store.find("甲")!.frozenAt, null);
+    assert.equal(store.find("甲")!.deadline, "2026-10-22");
+    assert.equal(store.find("甲")!.frozenReason, "");
+    assert.deepEqual(service.progress([]).games, ["甲", "乙"]);
+    assert.equal(service.setFrozen("00000000-0000-0000-0000-000000000000", true), undefined);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 // 測試舊資料庫遷移：固定兩欄（stage、adapter_stage）換成每條線一個階段的對照；重開不會重複遷移。
 test("GameStore migrates the fixed two-column stages", () => {
   useWorkflow(parseWorkflow({ tracks: [{ key: "prob", label: "甲線", stages: ["一", "二", "完成"] }, { key: "adapter", label: "乙線", stages: ["等", "做", "完成"] }] }));

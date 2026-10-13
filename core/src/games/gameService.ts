@@ -8,7 +8,7 @@ import type { WorkerProjectConfig } from "../localConfig.js";
 import type { EventHub } from "../protocol/eventHub.js";
 import { applyParsedGameBlock, parseGameBlock } from "./gameBlock.js";
 import { splitForConfirmation, type GameConfirmation, type GameConfirmationStore } from "./gameConfirmations.js";
-import { isFinished, isOpenTask, stageSummary, type Game, type GameStageEntry, type GameStore, type GameTask } from "./gameStore.js";
+import { isActive, isFinished, isOpenTask, stageSummary, type Game, type GameStageEntry, type GameStore, type GameTask } from "./gameStore.js";
 import { finalStage, stageIn, trackLabel, workflow } from "./workflow.js";
 import { LIST_PAST_DAYS, MeetingParseError, PROMPT_DAYS, daysFrom, dueReminder, meetingEnded, meetingLine, meetingStartAt, parseMeetingText, type Meeting, type MeetingStore } from "./meetings.js";
 import { responsibleSession, type StageGuideEntry, type StageGuideLookup } from "./stageGuide.js";
@@ -117,11 +117,21 @@ export class GameService {
     return `主人確認了：${list}\n${result}`;
   }
 
+  /** §93：主人在卡片上按凍結／解凍。回傳給對話的系統訊息；找不到卡片回傳 undefined。 */
+  setFrozen(id: string, frozen: boolean, reason = ""): string | undefined {
+    const game = this.#store.get(id);
+    if (game === undefined) return undefined;
+    const block = JSON.stringify({ action: "update", name: game.name, frozen, ...(frozen && reason !== "" ? { frozenReason: reason } : {}) });
+    const result = applyParsedGameBlock(this.#store, parseGameBlock(block), this.knownRepos(), this.#now());
+    this.#events?.broadcast("games.updated", { games: this.cards() });
+    return result;
+  }
+
   /** 進度資料：names 空白時是所有目前版本還沒完成的專案。回傳給艾莉絲整理的文字與找不到的名稱。 */
   progress(names: string[]): { text: string; missing: string[]; games: string[] } {
     const missing: string[] = [];
     let games: Game[];
-    if (names.length === 0) games = this.#store.list().filter((game) => !isFinished(game));
+    if (names.length === 0) games = this.#store.list().filter(isActive);
     else {
       games = [];
       for (const name of names) {
@@ -139,6 +149,11 @@ export class GameService {
   promptLines(): string[] {
     const now = this.#now();
     return this.#store.list().map((game) => {
+      // §93：凍結的專案只放一行，不列任務。
+      if (game.frozenAt !== null) {
+        const why = game.frozenReason === "" ? "" : `，${game.frozenReason}`;
+        return `- ${game.name}${game.code === "" ? "" : `（${game.code}）`}：凍結中（${game.frozenAt.slice(0, 10)} 起${why}）；${stageSummary(game)}`;
+      }
       const activity = this.#activityOf(game).lastActivityAt;
       const idle = activity === null ? "最後動靜查不到" : `最後動靜 ${daysBetween(new Date(activity), now)} 天前`;
       const extras = [
@@ -242,7 +257,7 @@ export class GameService {
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     if (this.#store.getMeta("review.date") === today) return false;
     this.#store.setMeta("review.date", today);
-    return this.#store.list().some((game) => !isFinished(game));
+    return this.#store.list().some(isActive);
   }
 
   /**
@@ -251,7 +266,7 @@ export class GameService {
    */
   reviewInputChanged(): boolean {
     const fixedNow = new Date(0);
-    const text = this.#store.list().filter((game) => !isFinished(game))
+    const text = this.#store.list().filter(isActive)
       .map((game) => formatProgress(collectProgress(game, this.#projects()), fixedNow, [], this.#recentCodex(game, this.#now()), this.#stageLines(game)))
       .join("\n\n");
     const fingerprint = createHash("sha256").update(text).digest("hex");

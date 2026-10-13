@@ -154,6 +154,8 @@ export const api = {
   report: (kind: ReportEntry["kind"], name: string) =>
     request<{ kind: string; name: string; text: string }>(`/api/reports/${kind}/${encodeURIComponent(name)}`),
   games: () => request<{ games: GameCard[]; tracks?: TrackView[]; taskSources?: string[] }>("/api/games"),
+  /** §93：凍結／解凍專案卡（解凍時 Core 把截止日延後凍結的天數）。 */
+  setFrozen: (id: string, frozen: boolean, reason = "") => post<{ ok: true }>(`/api/games/${encodeURIComponent(id)}/${frozen ? "freeze" : "unfreeze"}`, frozen && reason !== "" ? { reason } : {}),
   refreshProgress: () => post<{ replyId: string }>("/api/games/refresh"),
   gameConfirmations: () => request<{ confirmations: Array<Omit<GameConfirmation, "kind">> }>("/api/games/confirmations"),
   gameConfirmationAction: (id: string, action: "approve" | "reject") => post(`/api/games/confirmations/${encodeURIComponent(id)}/${action}`),

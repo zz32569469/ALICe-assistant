@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 
 import Database from "better-sqlite3";
 
-import { isFinished, type Game } from "../games/gameStore.js";
+import { isActive, type Game } from "../games/gameStore.js";
 import { daysBetween, localDate } from "../games/progress.js";
 import type { EventHub } from "../protocol/eventHub.js";
 
@@ -102,7 +102,7 @@ export function digestText(input: {
 }): string | undefined {
   const parts: string[] = [];
   for (const { game, lastActivityAt } of input.games) {
-    if (isFinished(game)) continue;
+    if (!isActive(game)) continue;
     if (game.deadline !== null) {
       const days = daysBetween(input.now, localDate(game.deadline));
       if (days < 0) parts.push(`${game.name} 已過截止日 ${-days} 天`);

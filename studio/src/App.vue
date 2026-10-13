@@ -13,9 +13,12 @@ import ThemePicker from "./components/ThemePicker.vue";
 import UsageTab from "./components/UsageTab.vue";
 
 // §51：拿掉「計畫」分頁（專案改由艾莉絲追蹤任務；Core 的計畫功能保留，核准卡片仍在聊天區）。
-type WorkTab = "games" | "meetings" | "codex" | "fortune" | "usage";
+// §92：右方功能列表依左側分頁分開：工作看專案、會議、Codex、用量；聊天看占卜。
+type WorkTab = "games" | "meetings" | "codex" | "usage";
+type ChatTab = "fortune";
 
 const workTab = ref<WorkTab>("games");
+const chatTab = ref<ChatTab>("fortune");
 
 // §78：左側「工作／聊天」分頁，各自一份紀錄；切過去就清掉那邊的新回覆標記。
 function selectThread(thread: "work" | "chat"): void {
@@ -43,6 +46,7 @@ if (initialCodex !== null && /^task-[a-z0-9-]+$/u.test(initialCodex)) {
 }
 watch(() => store.codexFocus.n, () => {
   if (store.codexFocus.id === "") return;
+  selectThread("work");
   workTab.value = "codex";
   narrowView.value = "work";
 });
@@ -268,14 +272,16 @@ onMounted(() => connect());
       />
       <section class="work-column">
         <div class="tabbar">
-        <nav class="tabs" role="tablist" style="padding-right: 150px">
+        <nav v-if="store.thread === 'chat'" class="tabs" role="tablist">
+          <button role="tab" :aria-selected="chatTab === 'fortune'" :class="{ active: chatTab === 'fortune' }" @click="chatTab = 'fortune'">占卜</button>
+        </nav>
+        <nav v-else class="tabs" role="tablist" style="padding-right: 150px">
           <button role="tab" :aria-selected="workTab === 'games'" :class="{ active: workTab === 'games' }" @click="workTab = 'games'">專案</button>
           <button role="tab" :aria-selected="workTab === 'meetings'" :class="{ active: workTab === 'meetings' }" :title="meetingsToday > 0 ? `今天還有 ${meetingsToday} 個會議` : undefined" @click="workTab = 'meetings'">會議<span v-if="meetingsToday > 0" class="tab-badge">{{ meetingsToday }}</span></button>
           <button role="tab" :aria-selected="workTab === 'codex'" :class="{ active: workTab === 'codex' }" @click="workTab = 'codex'">Codex</button>
-          <button role="tab" :aria-selected="workTab === 'fortune'" :class="{ active: workTab === 'fortune' }" @click="workTab = 'fortune'">占卜</button>
           <button role="tab" :aria-selected="workTab === 'usage'" :class="{ active: workTab === 'usage' }" @click="workTab = 'usage'">用量</button>
         </nav>
-        <span class="tab-actions">
+        <span v-if="store.thread === 'work'" class="tab-actions">
           <span v-if="refreshError" class="error small" :title="refreshError">{{ refreshError }}</span>
           <button
             class="primary small" :disabled="refreshing || store.connection !== 'open'"
@@ -284,10 +290,10 @@ onMounted(() => connect());
         </span>
         </div>
         <div class="tab-body">
-          <GamesTab v-if="workTab === 'games'" />
+          <FortuneTab v-if="store.thread === 'chat'" />
+          <GamesTab v-else-if="workTab === 'games'" />
           <MeetingsTab v-else-if="workTab === 'meetings'" />
           <CodexTab v-else-if="workTab === 'codex'" />
-          <FortuneTab v-else-if="workTab === 'fortune'" />
           <UsageTab v-else />
         </div>
       </section>

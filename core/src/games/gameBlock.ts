@@ -130,12 +130,31 @@ export function parseGameBlock(blockText: string): GameBlock {
   if (value.sections !== undefined) fields.sections = value.sections === null ? null : stringList(value.sections, "sections");
   if (value.repos !== undefined) fields.repos = stringList(value.repos, "repos");
   if (value.sessions !== undefined) fields.sessions = stringList(value.sessions, "sessions");
+  // §93：凍結／解凍；frozen 寫 true 時 Core 填上時間。
+  if (value.frozen !== undefined) {
+    if (typeof value.frozen !== "boolean") throw new Error("frozen 必須是 true 或 false");
+    fields.frozenAt = value.frozen ? "" : null;
+    fields.frozenReason = value.frozen && value.frozenReason !== undefined ? text(value.frozenReason, "frozenReason", 200) : "";
+  }
   const reason = value.reason === undefined ? undefined : text(value.reason, "reason", 300);
   return { action: value.action, name, fields, tasks: parseTaskOps(value.tasks), ...(reason ? { reason } : {}) };
 }
 
 function describe(game: Game): string {
-  return `${game.name}（${stageSummary(game)}${game.deadline === null ? "" : `，截止 ${game.deadline}`}）`;
+  return `${game.name}（${stageSummary(game)}${game.deadline === null ? "" : `，截止 ${game.deadline}`}${game.frozenAt === null ? "" : "，凍結中"}）`;
+}
+
+/** 兩個時間相差幾個日曆天（本機時區）。 */
+function calendarDays(from: Date, to: Date): number {
+  const day = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((day(to) - day(from)) / 86_400_000);
+}
+
+/** YYYY-MM-DD 加幾天。 */
+function addDays(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }
 
 export const compareVersion = (left: string, right: string): number => {
@@ -167,6 +186,7 @@ export function applyParsedGameBlock(store: GameStore, block: GameBlock, knownRe
   }
   const warnings = block.fields.docsDir != null && !existsSync(block.fields.docsDir) ? `（注意：找不到文件資料夾 ${block.fields.docsDir}）` : "";
   const at = now.toISOString();
+  if (block.fields.frozenAt === "") block.fields.frozenAt = at;
   if (block.action === "create") {
     if (store.find(block.name) !== undefined) return `專案卡未建立：已經有「${block.name}」，要改請用 update`;
     const game = store.create({ ...block.fields, name: block.fields.name ?? block.name }, at);
@@ -183,9 +203,21 @@ export function applyParsedGameBlock(store: GameStore, block: GameBlock, knownRe
     if (!isFinished(current)) return `專案卡未更新：v${current.version} 還沒完成（每條線都到最後一個階段才能開新版本）`;
     if ((block.fields.versionReason ?? "") === "") return "專案卡未更新：開新版本要寫 versionReason（需求來源）";
   }
+  // 已經凍結的再凍結一次：保留原本的凍結時間，只換原因。
+  if (block.fields.frozenAt != null && current.frozenAt !== null) block.fields.frozenAt = current.frozenAt;
+  // 解凍：凍結幾天，截止日就延後幾天（這次同時改截止日的話照主人給的）。
+  let frozenDays = 0;
+  if (block.fields.frozenAt === null && current.frozenAt !== null) {
+    frozenDays = Math.max(0, calendarDays(new Date(current.frozenAt), now));
+    if (current.deadline !== null && block.fields.deadline === undefined && frozenDays > 0) block.fields.deadline = addDays(current.deadline, frozenDays);
+  }
   const game = store.update(current.id, block.fields, at)!;
   const changes = [
     block.fields.version !== undefined && block.fields.version !== current.version ? `版本 v${current.version} → v${game.version}` : "",
+    current.frozenAt === null && game.frozenAt !== null ? `凍結${game.frozenReason === "" ? "" : `（${game.frozenReason}）`}` : "",
+    current.frozenAt !== null && game.frozenAt === null
+      ? `解除凍結（凍結 ${frozenDays} 天${game.deadline !== current.deadline && current.deadline !== null && game.deadline !== null ? `，截止日 ${current.deadline} → ${game.deadline}` : ""}）`
+      : "",
     ...workflow().tracks.map((track) => {
       const before = stageIn(current.trackStages, track);
       const after = stageIn(game.trackStages, track);

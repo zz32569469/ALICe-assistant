@@ -424,6 +424,30 @@ export class AliceHttpServer {
       sendJson(response, 200, { ok: true });
       return;
     }
+    // §93：卡片上的凍結／解凍。
+    const freezeMatch = /^\/api\/games\/([0-9a-f-]{36})\/(freeze|unfreeze)$/u.exec(url.pathname);
+    if (request.method === "POST" && freezeMatch !== null && this.#games !== undefined) {
+      let body: unknown;
+      try {
+        body = await readJsonBody(request);
+      } catch {
+        sendError(response, 400, "bad_request", "JSON 內容無效或超過 64 KB");
+        return;
+      }
+      const reason = (body as { reason?: unknown } | null)?.reason;
+      if (reason !== undefined && (typeof reason !== "string" || Array.from(reason).length > 200)) {
+        sendError(response, 400, "bad_request", "reason 必須是 200 字以內的字串");
+        return;
+      }
+      const text = this.#games.setFrozen(freezeMatch[1]!, freezeMatch[2] === "freeze", typeof reason === "string" ? reason.trim() : "");
+      if (text === undefined) {
+        sendError(response, 404, "not_found", "找不到這張專案卡");
+        return;
+      }
+      this.#conversation.postNotice(text);
+      sendJson(response, 200, { ok: true });
+      return;
+    }
     if (request.method === "GET" && url.pathname === "/api/games" && this.#games !== undefined) {
       sendJson(response, 200, { games: this.#games.cards(), tracks: workflow().tracks.map(({ key, label, stages }) => ({ key, label, stages })), taskSources: workflow().taskSources });
       return;

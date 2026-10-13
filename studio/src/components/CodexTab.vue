@@ -83,24 +83,20 @@ const shown = computed(() => {
     && (!q || `${job.label} ${job.repo} ${job.id} ${roleName(job)} ${job.by?.session ?? ""}`.toLowerCase().includes(q)));
 });
 
-/** 額度：剩餘百分比（原版一樣顯示「剩多少」），過了重置時間視為 100%。 */
+/** 額度：跟「用量」分頁一樣顯示已用百分比（85% 以上變紅）與重置時間；過了重置時間視為 0%。 */
 type QuotaWindow = NonNullable<CodexQuota["primary"]>;
 function quotaChip(window?: QuotaWindow) {
   if (window === undefined) return undefined;
   const reset = Number(window.resets_at) || 0;
   const expired = reset > 0 && reset * 1000 <= now.value;
-  const left = expired ? 100 : Math.max(0, Math.round(100 - Number(window.used_percent || 0)));
-  const when = (sec: number) => {
-    const date = new Date(sec * 1000);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${date.toDateString() === new Date().toDateString() ? "" : `${date.getMonth() + 1}/${date.getDate()} `}${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  };
+  const used = expired ? 0 : Math.min(100, Math.max(0, Math.round(Number(window.used_percent || 0))));
+  const when = (sec: number) => new Date(sec * 1000).toLocaleString([], { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   return {
-    name: (window.window_minutes ?? 0) >= 1440 ? "每週" : `${Math.round((window.window_minutes ?? 300) / 60)} 小時`,
-    left,
-    level: left < 20 ? "low" : left < 40 ? "warn" : "",
-    tip: expired ? "已過重置時間（尚無新資料，視為 100%）" : `已用 ${window.used_percent}%，${when(reset)} 重置`,
-    reset: reset > 0 && !expired ? `${when(reset)} 重置` : "",
+    name: (window.window_minutes ?? 0) >= 1440 ? "每週" : "短期",
+    used,
+    level: used >= 85 ? "high" : "",
+    tip: expired ? "已過重置時間（尚無新資料，視為 0%）" : `已用 ${window.used_percent}%，${when(reset)} 重置`,
+    reset: reset > 0 && !expired ? `重置 ${when(reset)}` : "",
   };
 }
 const quotaChips = computed(() => [quotaChip(quota.value?.primary), quotaChip(quota.value?.secondary)].filter((chip) => chip !== undefined));
@@ -226,10 +222,10 @@ onBeforeUnmount(() => timers.forEach(clearInterval));
         <span class="stat">❌ 失敗 <b>{{ counts.failed }}</b></span>
       </div>
       <div class="spacer" />
-      <div class="cb-quota" aria-label="Codex 剩餘額度">
+      <div class="cb-quota" aria-label="Codex 額度已用">
         <span v-if="quotaChips.length === 0" class="q"><small>Codex 額度：尚無資料</small></span>
         <span v-for="chip in quotaChips" :key="chip!.name" class="q" :class="chip!.level" :title="chip!.tip">
-          {{ chip!.name }} <span class="bar"><i :style="{ width: `${chip!.left}%` }" /></span><b>{{ chip!.left }}%</b><small v-if="chip!.reset">{{ chip!.reset }}</small>
+          {{ chip!.name }} <span class="bar"><i :style="{ width: `${chip!.used}%` }" /></span><b>{{ chip!.used }}%</b><small v-if="chip!.reset">{{ chip!.reset }}</small>
         </span>
       </div>
       <span class="updated">{{ lastUpdate ? `更新於 ${hms(lastUpdate)}` : "" }}</span>
@@ -364,9 +360,8 @@ button { font: inherit; }
 .cb-quota .q { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--cb-panel-2); border: 1px solid var(--cb-line); }
 .cb-quota .bar { width: 60px; height: 6px; border-radius: 3px; background: var(--cb-line); overflow: hidden; }
 .cb-quota .bar i { display: block; height: 100%; background: var(--ok); }
-.cb-quota .q.warn .bar i { background: var(--warn); }
-.cb-quota .q.low .bar i { background: var(--cb-fail); }
-.cb-quota .q.low b { color: var(--cb-fail); }
+.cb-quota .q.high .bar i { background: var(--danger); }
+.cb-quota .q.high b { color: var(--danger); }
 .cb-quota small { color: var(--muted); }
 
 .cb-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px 0; }

@@ -34,6 +34,9 @@ export type Game = {
   repos: string[];
   sessions: string[];
   note: string;
+  /** §93：凍結的時間（null＝沒凍結）。凍結的專案不核對進度、不催進度，卡片與任務保留。 */
+  frozenAt: string | null;
+  frozenReason: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -70,6 +73,11 @@ export function isFinished(game: Pick<Game, "trackStages">): boolean {
   return allFinished(game.trackStages);
 }
 
+/** §93：進行中＝目前版本還沒完成、也沒凍結（每日核對、更新進度只看這些）。 */
+export function isActive(game: Pick<Game, "trackStages" | "frozenAt">): boolean {
+  return game.frozenAt === null && !isFinished(game);
+}
+
 /** 一行摘要：版本與每條線的階段。 */
 export function stageSummary(game: Pick<Game, "trackStages" | "version">): string {
   if (isFinished(game)) return `v${game.version} 完成`;
@@ -79,7 +87,7 @@ export function stageSummary(game: Pick<Game, "trackStages" | "version">): strin
 type Row = {
   id: string; name: string; code: string; brand: string; docs_dir: string | null; file_prefix: string; spec: string; reference: string;
   deadline: string | null; track_stages: string | null; version: string; version_reason: string;
-  sections: string | null; repos: string; sessions: string; note: string; created_at: string; updated_at: string;
+  sections: string | null; repos: string; sessions: string; note: string; frozen_at: string | null; frozen_reason: string; created_at: string; updated_at: string;
 };
 
 function toGame(row: Row): Game {
@@ -89,6 +97,7 @@ function toGame(row: Row): Game {
     version: row.version, versionReason: row.version_reason,
     sections: row.sections === null ? null : JSON.parse(row.sections) as string[],
     repos: JSON.parse(row.repos) as string[], sessions: JSON.parse(row.sessions) as string[], note: row.note,
+    frozenAt: row.frozen_at, frozenReason: row.frozen_reason,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -150,6 +159,8 @@ export class GameStore {
     if (!games.includes("version")) this.#db.exec("ALTER TABLE games ADD COLUMN version TEXT NOT NULL DEFAULT '1.0.0'");
     if (!games.includes("version_reason")) this.#db.exec("ALTER TABLE games ADD COLUMN version_reason TEXT NOT NULL DEFAULT ''");
     if (!games.includes("brand")) this.#db.exec("ALTER TABLE games ADD COLUMN brand TEXT NOT NULL DEFAULT ''");
+    if (!games.includes("frozen_at")) this.#db.exec("ALTER TABLE games ADD COLUMN frozen_at TEXT");
+    if (!games.includes("frozen_reason")) this.#db.exec("ALTER TABLE games ADD COLUMN frozen_reason TEXT NOT NULL DEFAULT ''");
     if (!columns("game_stages").includes("track")) this.#db.exec(`ALTER TABLE game_stages ADD COLUMN track TEXT NOT NULL DEFAULT '${workflow().tracks[0]!.key}'`);
     if (!games.includes("track_stages")) {
       this.#db.exec("ALTER TABLE games ADD COLUMN track_stages TEXT");
@@ -189,12 +200,12 @@ export class GameStore {
     const next = { ...current, ...fields, trackStages: { ...current.trackStages, ...fields.trackStages } };
     this.#db.prepare(`
       UPDATE games SET name = ?, code = ?, brand = ?, docs_dir = ?, file_prefix = ?, spec = ?, reference = ?, deadline = ?, track_stages = ?,
-        version = ?, version_reason = ?, sections = ?, repos = ?, sessions = ?, note = ?, updated_at = ? WHERE id = ?
+        version = ?, version_reason = ?, sections = ?, repos = ?, sessions = ?, note = ?, frozen_at = ?, frozen_reason = ?, updated_at = ? WHERE id = ?
     `).run(
       next.name, next.code, next.brand, next.docsDir, next.filePrefix, next.spec, next.reference, next.deadline, JSON.stringify(next.trackStages),
       next.version, next.versionReason,
       next.sections === null ? null : JSON.stringify(next.sections), JSON.stringify(next.repos), JSON.stringify(next.sessions),
-      next.note, at, id,
+      next.note, next.frozenAt, next.frozenAt === null ? "" : next.frozenReason, at, id,
     );
     for (const track of workflow().tracks) {
       const before = stageIn(current.trackStages, track);

@@ -2,6 +2,7 @@
 // 專案卡：每個專案的版本、各條進度線的階段、任務、截止日、最後動靜。建立與修改都在對話裡跟 ALICe 說。
 import { computed, ref } from "vue";
 
+import { api } from "../api";
 import { store } from "../store";
 import type { GameCard, TrackView } from "../types";
 
@@ -29,7 +30,14 @@ function shortDate(value: string): string {
 
 const finished = (game: GameCard): boolean => TRACKS.value.length > 0 && TRACKS.value.every((track) => current(game, track.key) === finalOf(track));
 
-function deadline(game: GameCard): { main: string; sub: string; level: "" | "is-warn" | "is-danger" | "is-none" } {
+/** §93：凍結中（凍結的專案不核對、不催；解凍時截止日延後凍結的天數）。 */
+const frozen = (game: GameCard): boolean => game.frozenAt != null;
+function frozenDays(game: GameCard): number {
+  return game.frozenAt == null ? 0 : Math.max(0, Math.round((startOfDay(new Date()) - startOfDay(new Date(game.frozenAt))) / DAY_MS));
+}
+
+function deadline(game: GameCard): { main: string; sub: string; level: "" | "is-warn" | "is-danger" | "is-none" | "is-frozen" } {
+  if (frozen(game)) return { main: "凍結中", sub: game.deadline === null ? `已 ${frozenDays(game)} 天` : `截止 ${shortDate(game.deadline)}＋${frozenDays(game)} 天`, level: "is-frozen" };
   if (game.deadline === null) return { main: "未定", sub: "截止日", level: "is-none" };
   if (finished(game)) return { main: shortDate(game.deadline), sub: "截止日", level: "" };
   const days = daysUntil(game.deadline);
@@ -97,7 +105,7 @@ function saveCollapsed(): void {
     // 瀏覽器不允許儲存時，這次開著的期間仍有效。
   }
 }
-const isCollapsed = (game: GameCard): boolean => collapsedState.value[game.id] ?? finished(game);
+const isCollapsed = (game: GameCard): boolean => collapsedState.value[game.id] ?? (finished(game) || frozen(game));
 function toggle(game: GameCard): void {
   collapsedState.value = { ...collapsedState.value, [game.id]: !isCollapsed(game) };
   saveCollapsed();
@@ -108,18 +116,39 @@ function setAll(collapsed: boolean): void {
 }
 const allCollapsed = computed(() => store.games.length > 0 && store.games.every(isCollapsed));
 
-/** 收合時的一行摘要：兩條線的階段與進度、未完成與卡住的任務數。 */
+/** 收合時的一行摘要：凍結天數、每條線的階段與進度、未完成與卡住的任務數。 */
 function summary(game: GameCard): string {
-  if (finished(game)) return "兩條線都完成";
-  const parts = TRACKS.value.map((track) => `${track.label} ${current(game, track.key)}（${stageIndex(game, track) + 1}／${track.stages.length}）`);
+  if (finished(game)) return "每條線都完成";
+  const parts: string[] = frozen(game) ? [`凍結 ${frozenDays(game)} 天${game.frozenReason ? `（${game.frozenReason}）` : ""}`] : [];
+  parts.push(...TRACKS.value.map((track) => `${track.label} ${current(game, track.key)}（${stageIndex(game, track) + 1}／${track.stages.length}）`));
   const open = openTasks(game);
   const stuck = open.filter((task) => task.status === "卡住").length;
   if (open.length > 0) parts.push(`未完成 ${open.length}${stuck > 0 ? `，卡住 ${stuck}` : ""}`);
   return parts.join("・");
 }
 
+const freezeError = ref("");
+const freezing = ref("");
+async function setFrozen(game: GameCard, value: boolean): Promise<void> {
+  let reason = "";
+  if (value) {
+    const answer = window.prompt(`凍結「${game.name}」：原因（可以空白）。解凍時截止日會延後凍結的天數。`, "");
+    if (answer === null) return;
+    reason = answer.trim().slice(0, 200);
+  }
+  freezeError.value = "";
+  freezing.value = game.id;
+  try {
+    await api.setFrozen(game.id, value, reason);
+  } catch (error) {
+    freezeError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    freezing.value = "";
+  }
+}
+
 const sorted = computed(() => [...store.games].sort((left, right) => {
-  const done = (game: GameCard) => (finished(game) ? 1 : 0);
+  const done = (game: GameCard) => (finished(game) ? 2 : frozen(game) ? 1 : 0);
   return done(left) - done(right) || (left.deadline ?? "9999").localeCompare(right.deadline ?? "9999");
 }));
 </script>
@@ -133,7 +162,8 @@ const sorted = computed(() => [...store.games].sort((left, right) => {
     <div v-if="store.games.length > 1" class="toolbar">
       <button class="link small" @click="setAll(!allCollapsed)">{{ allCollapsed ? "全部展開" : "全部收合" }}</button>
     </div>
-    <article v-for="game in sorted" :key="game.id" class="card" :class="{ ended: finished(game), collapsed: isCollapsed(game) }">
+    <p v-if="freezeError" class="error small">{{ freezeError }}</p>
+    <article v-for="game in sorted" :key="game.id" class="card" :class="{ ended: finished(game), frozen: frozen(game), collapsed: isCollapsed(game) }">
       <header class="card-head" role="button" tabindex="0" :aria-expanded="!isCollapsed(game)" :title="isCollapsed(game) ? '展開' : '收合'" @click="toggle(game)" @keydown.enter.prevent="toggle(game)" @keydown.space.prevent="toggle(game)">
         <span class="chevron" aria-hidden="true">{{ isCollapsed(game) ? "▸" : "▾" }}</span>
         <div class="title">
@@ -141,6 +171,7 @@ const sorted = computed(() => [...store.games].sort((left, right) => {
           <span class="version" :class="{ done: finished(game) }">v{{ game.version }}{{ finished(game) ? " 完成" : "" }}</span>
           <span v-if="game.brand" class="code">{{ game.brand }}</span>
           <span v-if="game.code" class="code branch">{{ game.code }}</span>
+          <span v-if="frozen(game)" class="frozen-badge">❄ 凍結中</span>
         </div>
         <div class="deadline" :class="deadline(game).level">
           <span class="main num">{{ deadline(game).main }}</span>
@@ -150,6 +181,9 @@ const sorted = computed(() => [...store.games].sort((left, right) => {
       <p v-if="isCollapsed(game)" class="collapsed-summary small muted" @click="toggle(game)">{{ summary(game) }}</p>
 
       <template v-if="!isCollapsed(game)">
+      <p v-if="frozen(game)" class="frozen-note small">
+        {{ new Date(game.frozenAt!).toLocaleDateString([], { month: "numeric", day: "numeric" }) }} 起凍結，已 {{ frozenDays(game) }} 天<template v-if="game.frozenReason">（{{ game.frozenReason }}）</template>。ALICe 不會核對或催這個專案；解凍時截止日會延後凍結的天數。
+      </p>
       <div v-for="track in TRACKS" :key="track.key" class="stage">
         <p class="stage-name">
           <span class="lane">{{ track.label }}</span>
@@ -207,6 +241,9 @@ const sorted = computed(() => [...store.games].sort((left, right) => {
           <dd>{{ game.note }}</dd>
         </template>
       </dl>
+      <div v-if="!finished(game)" class="card-actions">
+        <button class="small" :disabled="freezing === game.id || store.connection !== 'open'" @click="setFrozen(game, !frozen(game))">{{ frozen(game) ? "解凍" : "凍結" }}</button>
+      </div>
       </template>
     </article>
     <p v-if="store.games.length > 0" class="muted small hint">每條線都到最後一個階段，這個版本就完成；之後有新需求再開新版本。按右上「更新進度」，ALICe 會依任務清單核對並更新卡片；要看詳細總覽，在對話裡問 ALICe「各專案現在怎樣」。</p>
@@ -219,6 +256,11 @@ const sorted = computed(() => [...store.games].sort((left, right) => {
 .empty p { margin: 4px 0; }
 .card { border: var(--bw) solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px 12px; background: var(--panel); box-shadow: var(--card-shadow); }
 .card.ended { opacity: 0.6; }
+.card.frozen { border-style: dashed; background: color-mix(in srgb, var(--panel) 88%, #7fb4e6); }
+.frozen-badge { font-size: 0.78em; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--panel) 60%, #7fb4e6); color: var(--text); white-space: nowrap; }
+.frozen-note { margin: 8px 0 4px; }
+.card-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.deadline.is-frozen .main { color: var(--muted); }
 .card header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .card-head { cursor: pointer; user-select: none; }
 .card-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
