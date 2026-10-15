@@ -135,12 +135,16 @@ export class CodexBoard {
   }
 }
 
-/** 一個專案相關的 Codex 任務：委派的 session 在卡片的 sessions 裡，或任務名稱含專案名稱或英文代號。 */
+/** session 名稱比對用：去掉接手時加的結尾編號（「<Project> - dev 2」算「<Project> - dev」），不分大小寫。 */
+export const sessionBase = (name: string): string => name.trim().replace(/\s+\d+$/u, "").toLowerCase();
+
+/** 一個專案相關的 Codex 任務：委派的 session 在卡片的 sessions 裡（接手的編號不算差別），或任務名稱含專案名稱或英文代號。 */
 export function jobsForGame(jobs: CodexJob[], game: { name: string; code: string; sessions: string[] }): CodexJob[] {
   const name = game.name.toLowerCase();
   const code = game.code.toLowerCase();
+  const sessions = new Set(game.sessions.map(sessionBase));
   return jobs.filter((job) => {
-    if (job.by?.session && game.sessions.includes(job.by.session)) return true;
+    if (job.by?.session && sessions.has(sessionBase(job.by.session))) return true;
     const label = job.label.toLowerCase();
     return (name !== "" && label.includes(name)) || (code !== "" && label.includes(code));
   });

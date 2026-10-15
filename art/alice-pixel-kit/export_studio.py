@@ -2,7 +2,7 @@
 只讀已定案的成品，不改設計；每一幀都先和存檔的成品逐像素比對，不同就停下來（避免匯出和定稿不一致）。"""
 import json, shutil, pathlib
 from PIL import Image
-import idle, walk, walk_side, walk_back, idle_dirs, sleep, sit34, jp_big, shade
+import idle, walk, walk_side, walk_back, idle_dirs, sleep, sit34, jp_big, shade, actions
 
 OUT = pathlib.Path("studio_export")
 W, H = 48, 43
@@ -28,7 +28,10 @@ def animations():
         f, fx, t = sleep.final(v);       same(f, f"sleep_out/final/{v}_f{{}}.png");       sleep_d[d] = (f, t); fx_d[d] = (fx, t)
     f, t = sit34.final();                same(f, "sit_out/final/type34_f{}.png")
     f2, t2 = sit34.final_drink();        same(f2, "sit_out/final/drink_f{}.png")
-    return {"idle": idle_d, "walk": walk_d, "sleep": sleep_d, "sleep_fx": fx_d, "typing": {"front_right": (f, t)}, "drink": {"front_right": (f2, t2)}}
+    acts = {}
+    for c in actions.REFINED:
+        fa, ta = actions.final(c);       same(fa, f"actions_out/final/{c}_f{{}}.png");    acts[c] = {"down": (fa, ta)}
+    return {"idle": idle_d, "walk": walk_d, "sleep": sleep_d, "sleep_fx": fx_d, "typing": {"front_right": (f, t)}, "drink": {"front_right": (f2, t2)}, **acts}
 
 def no_shadow(im):
     im = im.convert("RGBA").copy(); px = im.load()
@@ -111,7 +114,24 @@ def main():
         "rows": {"front_right": 0}, "frames": len(du), "loop": False, "durations_ms": du, "total_ms": sum(du),
         "note": "和 typing 同一個場景，播一次就回到 typing。第一格和最後一格就是 typing 的第 0 格：在 typing 播到第 0 格時切過來、播完再接回 typing 第 0 格，畫面不會跳。",
         "frame_notes": {"1": "手伸到杯子", "3": "拿到胸前", "4": "杯子到嘴前", "5": "閉眼喝一口", "9": "放回桌上"}}
-    manifest["directions_note"] = "待機、走路、睡覺有四個方向；打字（typing）和喝咖啡（drink）只有 front_right 一個角度"
+    # 自己設計的動作（使用者 2026-10-14 選的 9 個精修版）：只有正面，一列 down；頭上的小符號直接畫在格子裡
+    info = {c: (n, d) for c, n, d, u in actions.ACTIONS}
+    for c in actions.REFINED:
+        f, du = anims[c]["down"]
+        sheet([(f, du)]).save(OUT / f"{c}.png")
+        sheet([(f, du)], strip=True).save(OUT / f"{c}_noshadow.png")
+        loop = c in actions.LOOP
+        manifest["animations"][c] = {
+            "file": f"{c}.png", "file_noshadow": f"{c}_noshadow.png",
+            "description": f"{info[c][0]}：{info[c][1]}",
+            "rows": {"down": 0}, "frames": len(du), "loop": loop, "durations_ms": du, "total_ms": sum(du),
+            "group": "reaction",
+            "note": ("一直循環（等待回應時用）；照常呼吸，可以在任何一格切進來或切走。" if loop else
+                     "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。")
+                    + "只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
+                    + ("跳起來時角色整個往上、地面陰影留在原地變小（_noshadow 版沒有陰影，Studio 自己的陰影可以跟著縮小）。" if c in ("hop", "spin") else "")}
+    manifest["directions_note"] = ("待機、走路、睡覺有四個方向；打字（typing）和喝咖啡（drink）只有 front_right 一個角度；"
+                                   "反應動作（group: reaction：" + "、".join(actions.REFINED) + "）只有正面 down")
     # 頭像：從正面待機第一格裁切（不放大）
     first = anims["idle"]["down"][0][0].convert("RGBA")
     for size, box, note in ((32, (7, 1), "頭部＋肩膀（整個頭和蝴蝶結都在框內）"), (24, (11, 7), "臉部特寫（瀏海、眼睛、腮紅、嘴巴）")):
@@ -121,14 +141,15 @@ def main():
                                                 "crop": {"x": x, "y": y, "w": size, "h": size}, "note": note}
     # 調色盤：所有 sheet 實際用到的顏色＋各材質的色階（暗 → 亮）
     used = set()
-    for name in ("idle", "walk", "sleep", "sleep_fx", "typing", "drink"):
+    for name in ("idle", "walk", "sleep", "sleep_fx", "typing", "drink", *actions.REFINED):
         used |= {c[:3] for _, c in Image.open(OUT / f"{name}.png").convert("RGBA").getcolors(1 << 16) if c[3]}
     hexes = sorted(("#%02x%02x%02x" % c for c in used), key=lambda h: sum(int(h[i:i+2], 16) for i in (1, 3, 5)))
     palette = {"used_colors": hexes, "count": len(hexes),
                "ramps": {**jp_big.HUE}, "fixed": dict(shade.FIXED), "ground_shadow": "#d2cde2",
                "ramp_names": {"h": "頭髮", "s": "皮膚", "j": "外套（炭灰）", "t": "內搭（高領）", "k": "短褲／襪子",
                               "w": "鞋子（白）", "b": "藍色緞帶／袖口綁帶", "a": "椅子（白色辦公椅，打字場景）", "d": "桌子（木頭，打字場景）", "c": "筆電（銀色，打字場景）", "u": "馬克杯（白，打字場景）", "f": "咖啡", "x": "熱氣", "e": "眼線", "E": "瞳孔（深綠）", "m": "嘴巴"},
-               "note": "used_colors 是圖裡實際出現的全部顏色（含外框等規則算出來的顏色）；ramps 是各材質的基礎色階"}
+               "fx_colors": {k: "#%02x%02x%02x" % v[:3] for k, v in actions.C.items()},
+               "note": "used_colors 是圖裡實際出現的全部顏色（含外框等規則算出來的顏色）；ramps 是各材質的基礎色階；fx_colors 是反應動作頭上小符號的顏色（黃色只用在星星、拍手閃光）"}
     (OUT / "palette.json").write_text(json.dumps(palette, ensure_ascii=False, indent=2), encoding="utf-8")
     manifest["palette"] = "palette.json"
     manifest["docs"] = ["README.md", "STYLE_RULES.md", "alice_three_view_spec.md"]

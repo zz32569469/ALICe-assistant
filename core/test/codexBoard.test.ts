@@ -55,8 +55,11 @@ test("Codex jobs are matched to games and formatted for progress", () => {
     job({ id: "task-1", label: "其他工作", by: { session: "Test App - dev" } }),
     job({ id: "task-2", label: "testProject 購買審查" }),
     job({ id: "task-3", label: "別的專案", by: { session: "Other - dev" } }),
+    // 接手的 session 結尾多編號，一樣算同一個專案
+    job({ id: "task-4", label: "接手後的工作", by: { session: "test app - dev 2" } }),
+    job({ id: "task-5", label: "名稱不同", by: { session: "Test App - dev2" } }),
   ];
-  assert.deepEqual(jobsForGame(jobs, game).map((entry) => entry.id), ["task-1", "task-2"]);
+  assert.deepEqual(jobsForGame(jobs, game).map((entry) => entry.id), ["task-1", "task-2", "task-4"]);
   assert.equal(isRunningJob(job({ status: "running" })), true);
   assert.equal(isRunningJob(job({ status: "failed" })), false);
   assert.match(codexJobLine(job({ label: "匯出骨架", write: false, status: "completed", completedAt: "2026-10-06T03:21:41Z", durationMin: 9.5, by: { session: "Test App - dev" } })),

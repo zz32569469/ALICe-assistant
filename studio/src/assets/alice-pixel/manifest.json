@@ -249,6 +249,243 @@
         "5": "閉眼喝一口",
         "9": "放回桌上"
       }
+    },
+    "clap": {
+      "file": "clap.png",
+      "file_noshadow": "clap_noshadow.png",
+      "description": "拍手：手抬到胸前拍三下，拍的時候頭輕點、冒小閃光",
+      "rows": {
+        "down": 0
+      },
+      "frames": 11,
+      "loop": false,
+      "durations_ms": [
+        400,
+        160,
+        130,
+        170,
+        130,
+        170,
+        130,
+        170,
+        400,
+        300,
+        250
+      ],
+      "total_ms": 2410,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
+    },
+    "hop": {
+      "file": "hop.png",
+      "file_noshadow": "hop_noshadow.png",
+      "description": "開心跳一下：先蹲預備、跳起 4 格；起跳時頭髮慢一步、落下時頭髮往上飄，落地蹲一下吸收",
+      "rows": {
+        "down": 0
+      },
+      "frames": 10,
+      "loop": false,
+      "durations_ms": [
+        400,
+        140,
+        80,
+        140,
+        90,
+        70,
+        130,
+        160,
+        450,
+        250
+      ],
+      "total_ms": 1910,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；跳起來時角色整個往上、地面陰影留在原地變小（_noshadow 版沒有陰影，Studio 自己的陰影可以跟著縮小）。"
+    },
+    "love": {
+      "file": "love.png",
+      "file_noshadow": "love_noshadow.png",
+      "description": "愛心：雙手在胸前、臉紅、^ ^ 眼；愛心從小變大、晃著往上飄，另一邊再冒一顆小的",
+      "rows": {
+        "down": 0
+      },
+      "frames": 12,
+      "loop": false,
+      "durations_ms": [
+        300,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        300,
+        250
+      ],
+      "total_ms": 2650,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
+    },
+    "wink": {
+      "file": "wink.png",
+      "file_noshadow": "wink_noshadow.png",
+      "description": "眨眼：頭輕輕一歪、右眼眨成 ^，星星從眼角冒出來飄走",
+      "rows": {
+        "down": 0
+      },
+      "frames": 8,
+      "loop": false,
+      "durations_ms": [
+        600,
+        90,
+        110,
+        160,
+        160,
+        160,
+        300,
+        500
+      ],
+      "total_ms": 2080,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
+    },
+    "spin": {
+      "file": "spin.png",
+      "file_noshadow": "spin_noshadow.png",
+      "description": "轉一圈：蹲一下、輕輕跳起來轉一圈（用四方向定稿），落地 ^ ^ 眼和閃光",
+      "rows": {
+        "down": 0
+      },
+      "frames": 9,
+      "loop": false,
+      "durations_ms": [
+        400,
+        110,
+        100,
+        100,
+        100,
+        80,
+        130,
+        500,
+        250
+      ],
+      "total_ms": 1770,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；跳起來時角色整個往上、地面陰影留在原地變小（_noshadow 版沒有陰影，Studio 自己的陰影可以跟著縮小）。"
+    },
+    "loading": {
+      "file": "loading.png",
+      "file_noshadow": "loading_noshadow.png",
+      "description": "讀取中：照常呼吸，三個點在頭的右上方繞圈，眼睛看著點、偶爾眨眼",
+      "rows": {
+        "down": 0
+      },
+      "frames": 20,
+      "loop": true,
+      "durations_ms": [
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143,
+        143
+      ],
+      "total_ms": 2860,
+      "group": "reaction",
+      "note": "一直循環（等待回應時用）；照常呼吸，可以在任何一格切進來或切走。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
+    },
+    "shy": {
+      "file": "shy.png",
+      "file_noshadow": "shy_noshadow.png",
+      "description": "害羞：雙手交握、臉紅往下看，偷瞄一眼又低下去，手指不安地動",
+      "rows": {
+        "down": 0
+      },
+      "frames": 10,
+      "loop": false,
+      "durations_ms": [
+        300,
+        260,
+        260,
+        260,
+        260,
+        300,
+        300,
+        260,
+        260,
+        250
+      ],
+      "total_ms": 2710,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
+    },
+    "pout": {
+      "file": "pout.png",
+      "file_noshadow": "pout_noshadow.png",
+      "description": "生氣（鼓臉）：半閉眼、臉紅，生氣符號一跳一跳、跺兩下，最後「哼」把頭轉開噴一口氣",
+      "rows": {
+        "down": 0
+      },
+      "frames": 10,
+      "loop": false,
+      "durations_ms": [
+        300,
+        170,
+        170,
+        170,
+        170,
+        200,
+        260,
+        260,
+        500,
+        250
+      ],
+      "total_ms": 2450,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
+    },
+    "sad": {
+      "file": "sad.png",
+      "file_noshadow": "sad_noshadow.png",
+      "description": "難過：低頭、肩膀垂下，眼角冒出一滴淚滑下臉頰，最後閉上眼睛",
+      "rows": {
+        "down": 0
+      },
+      "frames": 12,
+      "loop": false,
+      "durations_ms": [
+        300,
+        300,
+        400,
+        260,
+        260,
+        260,
+        260,
+        260,
+        400,
+        800,
+        300,
+        250
+      ],
+      "total_ms": 4050,
+      "group": "reaction",
+      "note": "播一次的反應：第一格和最後一格就是 idle 的 down 第 0 格，在待機第 0 格時切過來、播完接回待機，畫面不會跳。只有正面（down）。頭上的小符號（愛心、星星、生氣符號、讀取的點等）已經畫在格子裡，不另外分層；"
     }
   },
   "avatar": {
@@ -275,7 +512,7 @@
       "note": "臉部特寫（瀏海、眼睛、腮紅、嘴巴）"
     }
   },
-  "directions_note": "待機、走路、睡覺有四個方向；打字（typing）和喝咖啡（drink）只有 front_right 一個角度",
+  "directions_note": "待機、走路、睡覺有四個方向；打字（typing）和喝咖啡（drink）只有 front_right 一個角度；反應動作（group: reaction：clap、hop、love、wink、spin、loading、shy、pout、sad）只有正面 down",
   "palette": "palette.json",
   "docs": [
     "README.md",

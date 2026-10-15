@@ -326,6 +326,19 @@ def build(Wpx=48, Hpx=72, clumps=False, tidy=False, polish=False, hair2=False, h
             if 0 <= X < Wpx and 0 <= Y < Hpx and (c != "H" or g[Y][X] in "hHL"):
                 g[Y][X] = c; depth[Y][X] = 80 if c == "H" else 95   # 綁起來的那束在蝴蝶結前面，不吃蝴蝶結的投影（會暗成一團）
         rows = ["".join(r) for r in g]
+    if front:   # 脖子對齊高領中間：縮小後脖子（2 格）落在高領（4 格）的右半邊，比臉和高領的中線偏右 1 格，
+                # 推 45 度時被誤導成「脖子在嘴巴正下方」（使用者 2026-10-07 指出、10-14 要求改正）
+        g = [list(r) for r in rows]
+        top = next((y for y in range(Hpx) if "t" in rows[y]), None)
+        if top:
+            ts = [x for x in range(Wpx) if g[top][x] == "t"]
+            neck = [x for x in range(min(ts), max(ts) + 1) if g[top - 1][x] in "sS"]
+            if neck and len(neck) < len(ts):
+                x0 = round((min(ts) + max(ts) + 1) / 2 - len(neck) / 2)
+                old = [(g[top - 1][x], depth[top - 1][x]) for x in neck]
+                for x in neck: g[top - 1][x] = "h"; depth[top - 1][x] = depth[top - 1][min(ts) - 1]
+                for i, (c, z) in enumerate(old): g[top - 1][x0 + i] = c; depth[top - 1][x0 + i] = z
+        rows = ["".join(r) for r in g]
     return rows, depth
 
 XCLIP = False

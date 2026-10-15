@@ -387,12 +387,12 @@ function jobTokens(job) {
 // 角色依工作目錄對應知識庫〈Claude Code 與 Codex 分工〉的角色表。
 const PROJECTS = path.join(os.homedir(), '.claude', 'projects');
 const ROLE_CONFIG = path.join(HERE, 'roles.json');
-// session 名稱照角色慣例：Library 是知識庫管理員；「<Project> - <角色>」取 - 後面的角色名稱。
+// session 名稱照角色慣例：Library 是知識庫管理員；「<Project> - <角色>」取 - 後面的角色名稱（接手的「<角色> 2」去掉編號）。
 const ROLE_BY_NAME = [
   [/^Library$/i, '知識庫管理員'],
   [/知識庫管理員/, '知識庫管理員'],
 ];
-const roleFromTitle = (title) => /\s-\s*(.+)$/u.exec(title)?.[1]?.trim();
+const roleFromTitle = (title) => /\s-\s*(.+?)(?:\s+\d+)?$/u.exec(title)?.[1]?.trim() ?? '';
 const sessionCache = new Map(); // sessionId -> { file, checkedAt, mtime, cwd, title }
 
 function findTranscript(sessionId) {
@@ -436,7 +436,7 @@ function jobRole(job) {
     // session 名稱照角色慣例（`Library`、`<Project> - <角色>`）優先，其次看工作目錄
     const byName = ROLE_BY_NAME.find(([re2]) => re2.test(title));
     const byDirectory = findRoleForDirectory(cwd, readRoles(ROLE_CONFIG));
-    const out = { role: byName ? byName[1] : byDirectory ?? roleFromTitle(title), session: title, cwd };
+    const out = { role: byName ? byName[1] : byDirectory || roleFromTitle(title), session: title, cwd };
     sessionCache.set(sid, { file, checkedAt: now, mtime, out });
     return out;
   } catch {

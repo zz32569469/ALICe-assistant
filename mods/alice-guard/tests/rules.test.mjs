@@ -78,3 +78,60 @@ test('message to ALICE: sender name and request body', () => {
   const body = rules.peerRequest('Lib', '【進度】測試專案\nT1 完成', 'id1')
   assert.deepEqual(body, { clientMsgId: 'id1', clientId: 'session:Lib', text: '［來自 session〈Lib〉］\n【進度】測試專案\nT1 完成' })
 })
+
+// 分支守衛：本款由 session 名稱認出，games 表給各款在各 repo 的分支。
+const games = {
+  'Alpha Quest': { 'team-a': 'brandx/alphaQuest', 'team-b': 'feature/alpha' },
+  'Beta Rush': { 'team-a': 'brandx/betaRush' },
+}
+const others = rules.otherBranches(games, 'team-a', 'Alpha Quest')
+const call = (command) => rules.gitCalls(command)[0]
+
+test('branch guard: session name and repo lookup', () => {
+  assert.equal(rules.gameNameOf('Alpha Quest - dev'), 'Alpha Quest')
+  assert.equal(rules.gameNameOf('Alpha Quest - dev 2'), 'Alpha Quest')
+  assert.equal(rules.gameNameOf('Library'), undefined)
+  assert.equal(rules.findGame('alpha quest', games), 'Alpha Quest')
+  assert.equal(rules.findGame('Gamma', games), undefined)
+  assert.equal(rules.repoInPath('C:/work/worktree/team-a-beta/src', ['team-a', 'team-b']), 'team-a')
+  assert.equal(rules.repoInPath('C:/work/team-a/team-b', ['team-a', 'team-b']), 'team-b')
+  assert.equal(rules.repoInPath('C:/work/alice', ['team-a']), undefined)
+  assert.deepEqual([...others], [['brandx/betaRush', 'Beta Rush']])
+  assert.deepEqual(rules.gitCalls('cd ../team-a && git -C "C:/x y/team-a" commit -m "a; b"'), [{ dir: 'C:/x y/team-a', sub: 'commit', args: ['-m', 'a; b'] }])
+  assert.deepEqual(rules.gitCalls('cd ../team-a && git status')[0].dir, '../team-a')
+})
+
+test('branch guard: writes on the own branch pass, writes on another game are blocked', () => {
+  // 本款分支：都放行
+  for (const command of ['git commit -m x', 'git push origin brandx/alphaQuest', 'git tag brandx/alphaQuest/v1.0.0.1', 'git merge main', 'git checkout brandx/alphaQuest']) {
+    assert.equal(rules.branchViolation(call(command), 'brandx/alphaQuest', others), undefined, command)
+  }
+  // 目前在別款分支：寫入擋
+  for (const command of ['git commit -m x', 'git merge main', 'git rebase main', 'git cherry-pick abc123', 'git push', 'git tag v1']) {
+    assert.match(rules.branchViolation(call(command), 'brandx/betaRush', others) ?? '', /Beta Rush/, command)
+  }
+  // 目標是別款：擋
+  for (const command of ['git checkout brandx/betaRush', 'git switch origin/brandx/betaRush', 'git merge brandx/betaRush', 'git push origin brandx/betaRush', 'git push origin HEAD:refs/heads/brandx/betaRush', 'git push origin brandx/betaRush/v1.0.0.1', 'git tag brandx/betaRush/v2 HEAD', 'git tag v9 brandx/betaRush']) {
+    assert.match(rules.branchViolation(call(command), 'brandx/alphaQuest', others) ?? '', /Beta Rush/, command)
+  }
+})
+
+test('branch guard: reads, file checkout, new branches, aborts and unlisted branches pass', () => {
+  for (const command of [
+    'git show brandx/betaRush:src/a.ts', 'git diff brandx/betaRush', 'git log brandx/betaRush', 'git blame a.ts',
+    'git checkout brandx/betaRush -- src/a.ts', 'git checkout brandx/betaRush src/a.ts', 'git checkout -b brandx/gamma brandx/betaRush',
+    'git checkout main', 'git checkout backup/old', 'git tag -l', 'git tag', 'git push origin main',
+  ]) {
+    const parsed = call(command)
+    assert.equal(rules.branchViolation(parsed, 'brandx/alphaQuest', others), undefined, command)
+  }
+  for (const command of ['git rebase --abort', 'git merge --abort', 'git cherry-pick --abort']) {
+    assert.equal(rules.branchViolation(call(command), 'brandx/betaRush', others), undefined, command)
+  }
+  // 查不到目前分支（detached）：只看目標
+  assert.equal(rules.branchViolation(call('git commit -m x'), undefined, others), undefined)
+  // 只讀的子指令不在需要查分支的清單
+  assert.equal(rules.BRANCH_WRITES.includes('show'), false)
+  // games 表沒有本款（session 名稱對不到）時，別款清單就是全部，由 register 決定不擋只提示
+  assert.equal(rules.findGame(rules.gameNameOf('Library'), games), undefined)
+})

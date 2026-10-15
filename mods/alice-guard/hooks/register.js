@@ -4,13 +4,65 @@
 // 3. 自動帶入角色指引：依 session 開在哪個資料夾，把對應的角色頁放進第一則訊息的背景資料。
 // 4. 直接送給 ALICE（§59）：SendMessage 傳給轉接 session（設定 alice.name）的訊息，改由 mod 直接送進 Core，
 //    不用轉接 session；Core 連不上時照原本方式送給轉接 session。ALICE 的回覆在 Web Studio，不會傳回寄件的 session。
-// 設定在本機 guard.local.json（不進 git），格式見 guard.example.json；沒有設定檔時三條都不作用。
+// 5. 分支守衛：多款遊戲共用一個團隊 repo 時，擋下工程師 session 寫到別款遊戲的分支（commit、切過去、merge、rebase、
+//    cherry-pick、push、tag）。本款由 session 名稱「<遊戲> - <角色>」認出，分支對照在設定的 games 表。
+// 設定在本機 guard.local.json（不進 git），格式見 guard.example.json；沒有設定檔時都不作用。
 
-import { editedPath, hasCoAuthor, inTeamRepo, isInside, peerRequest, riskyGit, roleFor, senderName, shellWritesVault } from './rules.js'
+import {
+  BRANCH_WRITES, branchViolation, editedPath, findGame, gameNameOf, gitCalls, hasCoAuthor, inTeamRepo, isInside, otherBranches,
+  peerRequest, repoInPath, riskyGit, roleFor, senderName, shellWritesVault,
+} from './rules.js'
 
 let cached
-/** 這個 session 的名稱（SessionStart 帶來的標題），送訊息給 ALICE 時當寄件人。 */
+/** 這個 session 的名稱（SessionStart、每則訊息帶來的標題），送訊息給 ALICE 時當寄件人，分支守衛也用它認出本款。 */
 let sessionTitle = ''
+/** 分支守衛未啟用的提示只給一次。 */
+let branchHintShown = false
+
+/**
+ * 5：分支守衛。回傳 { deny } 擋下、{ note } 放行但附一次提示，或 undefined。
+ * 只看會寫分支的 git 子指令；目前分支用 git rev-parse 實際查。
+ */
+async function branchGuard($, config, cwd, command) {
+  const names = config.teamRepos ?? []
+  const calls = gitCalls(command).filter((call) => BRANCH_WRITES.includes(call.sub))
+  if (names.length === 0 || calls.length === 0) return undefined
+  const game = findGame(gameNameOf(sessionTitle), config.games)
+  for (const call of calls) {
+    const dir = call.dir === undefined ? cwd : /^([a-z]:[\\/]|[\\/])/i.test(call.dir) ? call.dir : `${cwd}/${call.dir}`
+    const repo = repoInPath(dir, names)
+    if (repo === undefined) continue
+    if (game === undefined) {
+      if (branchHintShown) return undefined
+      branchHintShown = true
+      return { note: `alice-guard：games 表沒有本款（session 名稱「${sessionTitle || '（沒有名稱）'}」），分支守衛未啟用；寫入 git 前自己確認目前分支是本款的。` }
+    }
+    const others = otherBranches(config.games, repo, game)
+    if (others.size === 0) continue
+    let current
+    try {
+      const result = await $.process.run(['git', '-C', dir, 'rev-parse', '--abbrev-ref', 'HEAD'], { timeoutMs: 5000 })
+      const branch = result.stdout.trim()
+      if (result.exitCode === 0 && branch !== '' && branch !== 'HEAD') current = branch
+    } catch {
+      current = undefined
+    }
+    const reason = branchViolation(call, current, others)
+    if (reason !== undefined) {
+      const own = config.games[game]?.[repo]
+      return {
+        deny: [
+          `alice-guard（分支守衛）：已擋下 git ${call.sub}。`,
+          `- 原因：${reason}。`,
+          `- 目前分支：${current ?? '查不到（detached 或不是 git 目錄）'}`,
+          `- 這個 session 是〈${game}〉，在 ${repo} 應該在：${own ?? '（games 表沒有填這個 repo 的分支）'}`,
+          '這類操作要主人決定，先停下來說明狀況。',
+        ].join('\n'),
+      }
+    }
+  }
+  return undefined
+}
 
 /** 讀本機設定；讀不到就當成沒有設定（全部放行）。 */
 async function loadConfig($) {
@@ -38,6 +90,8 @@ export function register(on) {
     const config = await loadConfig($)
     const cwd = await $.session.cwd()
     const command = String(e.command ?? '')
+    const guard = await branchGuard($, config, cwd, command)
+    if (guard?.deny) return { deny: guard.deny }
     if (inTeamRepo(cwd, command, config)) {
       if (hasCoAuthor(command)) {
         return { deny: 'alice-guard：團隊 repo 的提交說明只寫標題，不加 Co-Authored-By。請拿掉那一行再提交。' }
@@ -52,7 +106,9 @@ export function register(on) {
         return { deny: 'alice-guard：知識庫對這個 session 唯讀。回寫候選記在更改紀錄「待回寫」，整批傳給 Library。' }
       }
     }
-    return next(e)
+    const result = await next(e)
+    if (guard?.note && !result.deny) return { ...result, context: [...(result.context ?? []), guard.note] }
+    return result
   })
 
   // 2：檔案工具寫入知識庫一律拒絕（開在知識庫裡的 session 除外）。
@@ -75,6 +131,11 @@ export function register(on) {
   // 4：記下 session 名稱。
   on('classic.SessionStart', async ($, e, next) => {
     if (typeof e.session_title === 'string') sessionTitle = e.session_title
+    return next(e)
+  })
+  // 5：session 改名後，下一則訊息會帶新的標題。
+  on('classic.UserPromptSubmit', async ($, e, next) => {
+    if (typeof e.session_title === 'string' && e.session_title !== '') sessionTitle = e.session_title
     return next(e)
   })
 

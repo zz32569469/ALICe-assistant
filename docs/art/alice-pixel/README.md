@@ -19,6 +19,8 @@
 | sleep_out/index.html | 睡覺動作的 zzz 特效比較頁（page_candidates_src.html 是動作候選頁的原稿） |
 | sit_out/final/ | 打字（45 度坐在桌前，桌上有咖啡杯）20 幀、喝咖啡 11 幀＋預覽 GIF（淺色、深色背景） |
 | sit_out/index.html | 打字、喝咖啡比較頁（45 度與第一版側面） |
+| actions_out/final/ | 反應動作（正面，精修版 9 個：拍手、跳一下、愛心、眨眼、轉一圈、讀取中、害羞、生氣、難過）各幀 PNG |
+| actions_out/index.html | 動作提案頁（精修版＋沒選的 17 個初版） |
 | studio_export/ | 給 ALICE Web Studio 的匯出包：sprite sheet、manifest.json、頭像、調色盤、文件副本 |
 | finals_v1/ | 舊定稿（鞋子外八、側面只有一張的版本） |
 | finals_v2/ | 舊定稿（沒有半綁髮、亮綠眼、藍色外套的版本） |
@@ -37,6 +39,7 @@ python -X utf8 -c "import idle, walk_back as wb; idle.save(*wb.final(), 'walk_ba
 python -X utf8 -c "import idle, idle_dirs as I; [idle.save(*I.final(v), f'idle_dirs_out/final/{v}') for v in ('left', 'right', 'back')]"
 python -X utf8 -c "import sleep; [sleep.save_final(v) for v in ('down', 'left', 'right', 'back')]"
 python -X utf8 -c "import idle, sit34; idle.save(*sit34.final(), 'sit_out/final/type34'); idle.save(*sit34.final_drink(), 'sit_out/final/drink')"
+python -X utf8 -c "import actions as A; [A.save_final(c) for c in A.REFINED]; A.save_gifs()"
 python -X utf8 export_studio.py
 python -X utf8 -c "import idle; idle.build_page(); idle.build_page('sleep_out/page_src.html', 'sleep_out/index.html'); idle.build_page('sit_out/page_src.html', 'sit_out/index.html'); idle.build_page('idle_dirs_out/page_src.html', 'idle_dirs_out/index.html'); idle.build_page('walk_out/page_src.html', 'walk_out/index.html'); idle.build_page('walk_side_out/page_src.html', 'walk_side_out/index.html')"
 ```

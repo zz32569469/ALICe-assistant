@@ -140,6 +140,9 @@ test('看板角色設定可缺省並正確對應', async t => {
   assert.equal(findRoleForDirectory(path.join(root, 'alpha'), readRoles(missing)), '');
   fs.writeFileSync(missing, JSON.stringify([{ folder: 'alpha', role: '專案工程師' }]));
   assert.equal(findRoleForDirectory(path.join(root, 'alpha', 'src'), readRoles(missing)), '專案工程師');
+  // 手動 worktree「<資料夾>-<名稱>」也算；只是開頭相同的別的資料夾不算。
+  assert.equal(findRoleForDirectory(path.join(root, 'worktree', 'alpha-feature', 'src'), readRoles(missing)), '專案工程師');
+  assert.equal(findRoleForDirectory(path.join(root, 'alphabet'), readRoles(missing)), '');
 });
 
 // 測試可攜範本與設定腳本不夾帶指定的組織專屬詞彙。

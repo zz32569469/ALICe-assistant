@@ -5,23 +5,45 @@
 // - 對話中（回覆中）、工作中：坐在桌前打字（45 度場景，只有一個角度）；每隔 8～15 秒，打字回到第 0 格時
 //   插播一次喝咖啡，喝完接回打字第 0 格（兩段的第 0 格是同一張，畫面不會跳）。
 // - 睡著：站著睡＋素材附的 zzz 特效層。
-// 換狀態時留在原地。每幀時間不等長（durations_ms），所以用 setTimeout 逐幀排程；系統「減少動態」時只顯示第一格。
+// - §99 回覆中（等待回應）：讀取中（正面、循環）；背景工作（busy）照舊打字。
+// - §99 一次性反應（store.reaction）：回覆完成跳一下／拍手、被稱讚害羞／愛心、出錯難過；點她眨眼（每第 3 下轉一圈），
+//   8 秒內戳到第 5 下鼓臉生氣。反應播完才回到目前狀態，播放中狀態改變也等它播完。
+// 換狀態時留在原地。每幀時間不等長（durations_ms），所以用 setTimeout 逐幀排程；系統「減少動態」時只顯示第一格、不播反應。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import manifest from "../assets/alice-pixel/manifest.json";
+import clapSheet from "../assets/alice-pixel/clap_noshadow.png";
 import drinkSheet from "../assets/alice-pixel/drink_noshadow.png";
+import hopSheet from "../assets/alice-pixel/hop_noshadow.png";
 import idleSheet from "../assets/alice-pixel/idle_noshadow.png";
+import loadingSheet from "../assets/alice-pixel/loading_noshadow.png";
+import loveSheet from "../assets/alice-pixel/love_noshadow.png";
+import poutSheet from "../assets/alice-pixel/pout_noshadow.png";
+import sadSheet from "../assets/alice-pixel/sad_noshadow.png";
+import shySheet from "../assets/alice-pixel/shy_noshadow.png";
 import sleepFxSheet from "../assets/alice-pixel/sleep_fx.png";
 import sleepSheet from "../assets/alice-pixel/sleep_noshadow.png";
+import spinSheet from "../assets/alice-pixel/spin_noshadow.png";
 import typingSheet from "../assets/alice-pixel/typing_noshadow.png";
 import walkSheet from "../assets/alice-pixel/walk_noshadow.png";
+import winkSheet from "../assets/alice-pixel/wink_noshadow.png";
+import { store } from "../store";
 
-type Clip = "idle" | "walk" | "sleep" | "typing" | "drink";
+const REACTIONS = ["clap", "hop", "love", "wink", "spin", "shy", "pout", "sad"] as const;
+type Reaction = typeof REACTIONS[number];
+type Clip = "idle" | "walk" | "sleep" | "typing" | "drink" | "loading" | Reaction;
 type Spec = { frames: number; durations_ms: number[]; rows: Record<string, number> };
 
 const props = withDefaults(defineProps<{ activity?: string; scale?: number }>(), { activity: "idle", scale: 2 });
 
-const SHEETS: Record<Clip, string> = { idle: idleSheet, walk: walkSheet, sleep: sleepSheet, typing: typingSheet, drink: drinkSheet };
+const SHEETS: Record<Clip, string> = {
+  idle: idleSheet, walk: walkSheet, sleep: sleepSheet, typing: typingSheet, drink: drinkSheet, loading: loadingSheet,
+  clap: clapSheet, hop: hopSheet, love: loveSheet, wink: winkSheet, spin: spinSheet, shy: shySheet, pout: poutSheet, sad: sadSheet,
+};
+const isReaction = (name: string): name is Reaction => (REACTIONS as readonly string[]).includes(name);
+/** §99 戳：8 秒內第 5 下生氣。 */
+const POKE_WINDOW_MS = 8000;
+const POKE_LIMIT = 5;
 const FRAME_W = manifest.frame_width;
 const FRAME_H = manifest.frame_height;
 /** 走路時每一步移動的像素（1 倍尺寸）。 */
@@ -43,7 +65,8 @@ const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(pre
 
 /** 狀態對應的主要動作。 */
 const base = computed<Clip>(() => {
-  if (props.activity === "talking" || props.activity === "busy") return "typing";
+  if (props.activity === "talking") return "loading";
+  if (props.activity === "busy") return "typing";
   if (props.activity === "sleeping") return "sleep";
   return "idle";
 });
@@ -93,6 +116,11 @@ function startWalk(now: number): void {
 function tick(): void {
   const now = Date.now();
   const last = frame.value + 1 >= spec.value.frames;
+  // §99 反應播完：回到目前狀態的主要動作。
+  if (isReaction(clip.value) && last) {
+    start(base.value);
+    return;
+  }
   if (clip.value === "drink" && last) {
     play("typing");
     phaseUntil = now + between(DRINK_EVERY_MS);
@@ -129,7 +157,30 @@ function start(next: Clip): void {
   schedule();
 }
 
-watch(base, start);
+// 反應播放中不打斷，播完會接回當時的狀態。
+watch(base, (next) => {
+  if (!isReaction(clip.value)) start(next);
+});
+
+/** §99 播一次反應（減少動態時不播）。 */
+function playReaction(name: string): void {
+  if (reducedMotion || !isReaction(name)) return;
+  play(name);
+  schedule();
+}
+watch(() => store.reaction.n, () => playReaction(store.reaction.name));
+
+let pokes: number[] = [];
+function poke(): void {
+  const now = Date.now();
+  pokes = [...pokes.filter((at) => now - at < POKE_WINDOW_MS), now];
+  if (pokes.length >= POKE_LIMIT) {
+    pokes = [];
+    playReaction("pout");
+  } else {
+    playReaction(pokes.length % 3 === 0 ? "spin" : "wink");
+  }
+}
 
 onMounted(() => start(base.value));
 onBeforeUnmount(() => clearTimeout(timer));
@@ -137,7 +188,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 
 <template>
   <div ref="stage" class="sprite-stage" :style="{ height: `${FRAME_H * scale}px` }" aria-hidden="true">
-    <div class="sprite-wrap" :style="{ right: `${Math.min(offset, maxOffset())}px`, width: `${FRAME_W * scale}px` }">
+    <div class="sprite-wrap" :style="{ right: `${Math.min(offset, maxOffset())}px`, width: `${FRAME_W * scale}px` }" title="戳一下艾莉絲" @click="poke">
       <span v-if="!inScene" class="shadow" :style="{ width: `${16 * scale}px`, height: `${5 * scale}px`, left: `${16 * scale}px`, top: `${37 * scale}px` }" />
       <div class="sprite" :style="spriteStyle" />
       <div v-if="clip === 'sleep'" class="sprite fx" :style="fxStyle" />
@@ -148,7 +199,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 <style scoped>
 .sprite-stage { position: relative; pointer-events: none; }
 /* 用離右邊的距離定位，拖曳分隔線改變寬度時不會跑出舞台。 */
-.sprite-wrap { position: absolute; bottom: 0; transition: right 0.16s linear; }
+.sprite-wrap { position: absolute; bottom: 0; transition: right 0.16s linear; pointer-events: auto; cursor: pointer; }
 .sprite { position: relative; image-rendering: pixelated; background-repeat: no-repeat; }
 .fx { position: absolute; left: 0; top: 0; }
 /* 不透明陰影只適合淺色背景，這裡一律用無陰影素材，自己畫半透明橢圓（素材說明 x 16–31、y 37–41）。打字、喝咖啡是含家具的場景，不另外畫。 */

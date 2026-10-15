@@ -262,7 +262,7 @@ export function formatProgress(progress: GameProgress, now: Date, tasks: GameTas
   for (const task of listed) {
     lines.push(`  - T${task.number}〔${trackLabel(task.track)}・${task.status}・${task.source}・v${task.version}〕${task.title}${task.note === "" ? "" : `— ${task.note}`}（更新 ${task.updatedAt.slice(0, 10)}）`);
   }
-  // §65：最近的 Codex 任務（看板），實作或唯讀審查。
+  // §65：最近的 Codex 任務（看板）：寫測試或唯讀審查（較早的可能是實作）。
   if (codexJobs.length > 0) {
     lines.push("- Codex 任務（看板，最近 7 天）：");
     for (const job of codexJobs) lines.push(codexJobLine(job));

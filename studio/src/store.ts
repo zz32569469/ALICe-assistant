@@ -52,6 +52,10 @@ export const store = reactive({
   proxy: false,
   /** §71：要切到 Codex 分頁並選的任務（n 每次加一，同一個任務再按也會觸發）。 */
   codexFocus: { id: "", n: 0 },
+  /** §99 艾莉絲的一次性反應（像素動作）：n 每次加一，AliceSprite 看到變化就播 name。 */
+  reaction: { name: "", n: 0 },
+  /** §99 主人剛送出稱讚：這則回覆完成時不再播完成動作（稱讚時已經害羞過）。 */
+  praised: false,
   /** 最近結束（完成或失敗）的回覆 id，「更新進度」按鈕用來知道這輪做完了（§51）。 */
   endedReplies: [] as string[],
   /** 工作面板目前選取的計畫與頻道（切換分頁後保留）。 */
@@ -159,6 +163,16 @@ async function reloadAll(): Promise<void> {
   }
 }
 
+/** §99 播一次艾莉絲的反應動作。 */
+export function react(name: string): void {
+  store.reaction = { name, n: store.reaction.n + 1 };
+}
+
+/** §99 主人的訊息是不是在稱讚或道謝。 */
+export function isPraise(text: string): boolean {
+  return /謝謝|感謝|謝啦|多謝|好棒|很棒|超棒|太棒|真棒|厲害|好讚|很讚|超讚|做得好|幹得好|辛苦了|可愛|愛你|好樣的|\b(thanks|thank you|thx|good job|great job|well done|nice)\b/iu.test(text);
+}
+
 function handleEvent(event: EventEnvelope): void {
   const data = event.data;
   switch (event.type) {
@@ -181,6 +195,9 @@ function handleEvent(event: EventEnvelope): void {
       return;
     }
     case "reply.end":
+      // §99 回覆完成：開心跳一下或拍手（剛被稱讚過就不再播）。
+      if (store.praised) store.praised = false;
+      else react(Math.random() < 0.5 ? "hop" : "clap");
       delete store.streaming[String(data.replyId)];
       markEnded(String(data.replyId));
       if (data.message !== undefined) upsertMessage(data.message as Message);
@@ -190,6 +207,8 @@ function handleEvent(event: EventEnvelope): void {
       delete store.streaming[replyId];
       markEnded(replyId);
       const error = data.error as { message?: string } | undefined;
+      store.praised = false;
+      react("sad");
       store.replyErrors.push({ replyId, message: error?.message ?? "回覆失敗", at: event.ts });
       return;
     }

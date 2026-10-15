@@ -21,6 +21,15 @@
       "page": "C:/path/to/knowledge-vault/wiki/roles/docs.md"
     }
   ],
+  "games": {
+    "Alpha Quest": {
+      "team-repo-a": "brand/alphaQuest",
+      "team-repo-b": "feature/alphaQuest"
+    },
+    "Beta Rush": {
+      "team-repo-a": "brand/betaRush"
+    }
+  },
   "alice": {
     "name": "ALICE",
     "url": "http://127.0.0.1:7788",

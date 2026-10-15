@@ -94,3 +94,172 @@ export function peerRequest(name, text, id) {
     text: `［來自 session〈${name}〉］\n${text}`,
   }
 }
+
+// ---------- 分支守衛（多款遊戲共用一個 repo，用分支區分）----------
+// 設定 games：{ "<遊戲>": { "<團隊 repo 資料夾>": "<本款分支>" } }，由主人填（遊戲名與分支名不一定對得上，不推算）。
+// session 名稱「<遊戲> - <角色>」（接手的「<遊戲> - <角色> 2」也算）認出本款；「別款」＝表裡其他遊戲的分支。
+
+/** session 名稱「<遊戲> - <角色>」的遊戲部分；不是這個格式回 undefined。 */
+export function gameNameOf(title) {
+  const match = /^(.+?)\s+-\s+\S/.exec(String(title ?? '').trim())
+  return match ? match[1].trim() : undefined
+}
+
+/** games 表裡的遊戲（名稱不分大小寫）；沒有回 undefined。 */
+export function findGame(name, games) {
+  if (!name) return undefined
+  const key = String(name).toLowerCase()
+  return Object.keys(games ?? {}).find((game) => game.toLowerCase() === key)
+}
+
+/** 路徑在哪個團隊 repo：從最深的一段往上找，等於名稱或「名稱-xxx」（worktree、副本）。 */
+export function repoInPath(path, names) {
+  const segments = norm(path).split('/').filter(Boolean).reverse()
+  for (const segment of segments) {
+    const exact = names.find((name) => segment === String(name).toLowerCase())
+    if (exact) return exact
+    const copy = names.find((name) => segment.startsWith(String(name).toLowerCase() + '-'))
+    if (copy) return copy
+  }
+  return undefined
+}
+
+/** 把一段指令切成詞（處理單、雙引號）。 */
+function words(text) {
+  const out = []
+  const re = /"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+)/g
+  for (let m; (m = re.exec(text)); ) out.push(m[1] ?? m[2] ?? m[3])
+  return out
+}
+
+/** 把指令依 &&、||、;、|、換行切段（引號裡的不切）。 */
+function segments(command) {
+  const out = []
+  let current = ''
+  let quote = ''
+  const text = String(command)
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
+    if (quote) {
+      if (ch === '\\' && quote === '"') { current += ch + (text[i + 1] ?? ''); i += 1; continue }
+      if (ch === quote) quote = ''
+      current += ch
+      continue
+    }
+    if (ch === '"' || ch === "'") { quote = ch; current += ch; continue }
+    if (ch === ';' || ch === '\n' || ch === '|' || (ch === '&' && text[i + 1] === '&')) {
+      out.push(current)
+      current = ''
+      if ((ch === '&' || ch === '|') && text[i + 1] === ch) i += 1
+      continue
+    }
+    current += ch
+  }
+  out.push(current)
+  return out
+}
+
+/** 指令裡的 git 呼叫：{ dir（-C 或前面 cd 的路徑，沒有就是 undefined）, sub, args }。 */
+export function gitCalls(command) {
+  const calls = []
+  let dir
+  for (const part of segments(command)) {
+    const w = words(part.trim())
+    if (w[0] === 'cd' || w[0] === 'Set-Location' || w[0] === 'pushd') {
+      if (w[1]) dir = w[1]
+      continue
+    }
+    const at = w.indexOf('git')
+    if (at < 0) continue
+    let i = at + 1
+    let callDir = dir
+    while (i < w.length && w[i].startsWith('-')) {
+      if (w[i] === '-C') { callDir = w[i + 1]; i += 2; continue }
+      if (w[i] === '-c') { i += 2; continue }
+      i += 1
+    }
+    if (i < w.length) calls.push({ dir: callDir, sub: w[i], args: w.slice(i + 1) })
+  }
+  return calls
+}
+
+/** 這些子指令才需要查分支（其他都是唯讀或與分支無關）。 */
+export const BRANCH_WRITES = ['commit', 'checkout', 'switch', 'merge', 'rebase', 'cherry-pick', 'push', 'tag']
+
+const OPTIONS_WITH_VALUE = new Set(['-m', '-F', '-b', '-B', '-c', '-C', '--orphan', '-X', '-s', '--strategy', '-o', '--onto', '--exec', '-u', '--message', '--file', '--author', '--date'])
+
+/** 不是選項的參數（略過選項本身與它帶的值）。 */
+function positionals(args) {
+  const out = []
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]
+    if (arg === '--') break
+    if (arg.startsWith('-')) {
+      if (OPTIONS_WITH_VALUE.has(arg)) i += 1
+      continue
+    }
+    out.push(arg)
+  }
+  return out
+}
+
+/** ref 去掉 origin/、refs/heads/ 等前綴。 */
+function branchName(ref) {
+  return String(ref).replace(/^\+/, '').replace(/^refs\/(heads|remotes\/[^/]+)\//, '').replace(/^(origin|upstream)\//, '')
+}
+
+/**
+ * 一個 git 呼叫會不會寫到別款遊戲的分支；會的話回傳原因，不會回 undefined。
+ * others：別款分支 → 遊戲名稱；current：目前分支（detached 或查不到是 undefined）。
+ */
+export function branchViolation(call, current, others) {
+  const other = (ref) => {
+    const name = branchName(ref)
+    for (const [branch, game] of others) if (name === branch || name.startsWith(branch + '/')) return { branch, game }
+    return undefined
+  }
+  const onOther = current === undefined ? undefined : other(current)
+  const { sub, args } = call
+  const pos = positionals(args)
+  const has = (...flags) => args.some((arg) => flags.includes(arg))
+  const here = onOther && `目前分支 ${current} 是〈${onOther.game}〉的分支`
+  if (sub === 'commit' && onOther) return `${here}，提交會落到別款`
+  if (sub === 'checkout' || sub === 'switch') {
+    // 從別款帶檔（checkout <分支> -- 檔、或分支後面接檔案）只改工作區、不換分支，不擋；開新分支（-b 等）也不擋。
+    if (args.includes('--') || has('-b', '-B', '-c', '-C', '--orphan', '--detach') || pos.length !== 1) return undefined
+    const target = other(pos[0])
+    return target && `${pos[0]} 是〈${target.game}〉的分支，切過去之後的操作會落到別款`
+  }
+  if (sub === 'merge' || sub === 'rebase' || sub === 'cherry-pick') {
+    if (has('--abort', '--quit', '--skip')) return undefined
+    if (onOther) return `${here}，${sub} 會改到別款的歷史`
+    const target = pos.map(other).find(Boolean)
+    return target && `${target.branch} 是〈${target.game}〉的分支，${sub} 會把別款的內容帶進來`
+  }
+  if (sub === 'push') {
+    const refs = pos.slice(1).flatMap((spec) => spec.split(':')).filter(Boolean)
+    const target = refs.map(other).find(Boolean)
+    if (target) return `${target.branch} 是〈${target.game}〉的分支（或它的 tag），不能從這個 session 推`
+    if (refs.length === 0 && onOther) return `${here}，push 會推別款的分支`
+    return undefined
+  }
+  if (sub === 'tag') {
+    if (has('-l', '--list', '-d', '--delete', '-v', '--verify') || pos.length === 0) return undefined
+    const named = other(pos[0])
+    if (named) return `tag ${pos[0]} 是〈${named.game}〉的 tag`
+    const target = pos[1] ? other(pos[1]) : onOther && { branch: current, game: onOther.game }
+    return target && `tag 會打在〈${target.game}〉的分支 ${target.branch} 上`
+  }
+  return undefined
+}
+
+/** games 表裡某個 repo 的別款分支：分支 → 遊戲名稱（不含本款）。 */
+export function otherBranches(games, repo, own) {
+  const out = new Map()
+  for (const [game, branches] of Object.entries(games ?? {})) {
+    if (game === own) continue
+    const branch = branches?.[repo]
+    if (typeof branch === 'string' && branch !== '') out.set(branch, game)
+  }
+  return out
+}

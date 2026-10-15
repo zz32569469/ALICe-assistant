@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 
 import { api, type Thread } from "../api";
-import { loadOlderMessages, store } from "../store";
+import { isPraise, loadOlderMessages, react, store } from "../store";
 import miniAvatar from "../assets/alice-pixel/avatar_24.png";
 import AliceSprite from "./AliceSprite.vue";
 import ConfirmCard from "./ConfirmCard.vue";
@@ -100,6 +100,11 @@ async function send(asPlan = false): Promise<void> {
   try {
     // 「做成計畫」與命令列的 /計畫 相同：附上要求並用深想。
     await api.send(asPlan ? `${text}${PLAN_SUFFIX}` : text, asPlan || deep.value, props.thread, images);
+    // §99 被稱讚：害羞或愛心。
+    if (isPraise(text)) {
+      store.praised = true;
+      react(Math.random() < 0.5 ? "shy" : "love");
+    }
     draft.value = "";
     for (const entry of attachments.value) URL.revokeObjectURL(entry.preview);
     attachments.value = [];
